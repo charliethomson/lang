@@ -64,33 +64,31 @@ fn scan_ident(chars: Chars<'_>) -> Option<(Token, usize)> {
     Some((Token::Identifier(buffer.clone()), buffer.len() - 1))
 }
 
-fn scan(c: char, chars: Chars<'_>) -> Result<(Token, usize), String> {
+fn scan(c: char, chars: Chars<'_>) -> (Token, usize) {
     let mut chars = chars;
     let mut buffer = c.to_string();
 
     while let Some(c) = chars.next() {
         if c.is_whitespace() {
-            if let Ok(tok) = Token::try_from(&buffer) {
-                return Ok((tok, buffer.len() - 2));
-            } else if let Some(m) = regex::Regex::new(IDENT_REGEX_STR).unwrap().find(&buffer) {
-                return Ok((Token::Identifier(m.as_str().to_owned()), buffer.len() - 2));
-            } else {
-                println!("hit whitespace");
-                return Err(buffer);
-            }
+            break;
         } else if let Ok(tok) = Token::try_from(&buffer) {
-            return Ok((tok, buffer.len() - 2));
-        } else if let Some(m) = regex::Regex::new(IDENT_REGEX_STR).unwrap().find(&buffer) {
-            return Ok((Token::Identifier(m.as_str().to_owned()), buffer.len() - 2));
+            return (tok, buffer.len() - 2);
+        } else if !is_valid_ident_char(c) {
+            return (
+                Token::Identifier(buffer.clone()),
+                buffer.len().checked_sub(2).unwrap_or(0),
+            );
         } else {
             buffer.push(c);
         }
     }
     if let Ok(tok) = Token::try_from(&buffer) {
-        Ok((tok, buffer.len() - 2))
+        (tok, buffer.len() - 2)
     } else {
-        println!("failed");
-        Err(buffer)
+        (
+            Token::Identifier(buffer.clone()),
+            buffer.len().checked_sub(2).unwrap_or(0),
+        )
     }
 }
 
@@ -126,23 +124,12 @@ pub fn lex(input: String) -> TokenStream {
                 tokens.push(tok);
             } else {
             }
-        } else if c == '$' {
-            if let Some((tok, amt)) = scan_ident(chars.clone()) {
-                chars.nth(amt);
-                tokens.push(tok);
-            } else {
-            }
         } else {
-            match scan(c, chars.clone()) {
-                Ok((tok, amt)) => {
-                    chars.nth(amt);
-                    tokens.push(tok);
-                }
-                Err(buffer) => {
-                    eprintln!("{:?}", tokens);
-                    panic!("Unable to tokenize buffer: {:?}", buffer);
-                }
+            let (tok, amt) = scan(c, chars.clone());
+            if amt != 0 {
+                chars.nth(amt);
             }
+            tokens.push(tok);
         }
     }
 
@@ -189,19 +176,19 @@ pub mod tests {
         let test_str = "let";
         let mut chars = test_str.chars();
         let c = chars.next().unwrap();
-        let res = scan(c, chars.clone()).unwrap();
+        let res = scan(c, chars.clone());
         assert_eq!(res.0, Token::Keyword(Keyword::Let),);
         chars.nth(res.1);
         let test_str = "return a;";
         let mut chars = test_str.chars();
         let c = chars.next().unwrap();
-        let res = scan(c, chars.clone()).unwrap();
+        let res = scan(c, chars.clone());
         assert_eq!(res.0, Token::Keyword(Keyword::Return),);
         chars.nth(res.1);
         let test_str = "for";
         let mut chars = test_str.chars();
         let c = chars.next().unwrap();
-        let res = scan(c, chars.clone()).unwrap();
+        let res = scan(c, chars.clone());
         assert_eq!(res.0, Token::Keyword(Keyword::For),);
         chars.nth(res.1);
     }
@@ -231,18 +218,28 @@ pub mod tests {
             Token::Operator(Operator::Add),
             Token::Identifier("y".to_owned()),
             Token::Punctuation(Punctuation::Semicolon),
+            Token::Keyword(Keyword::Let),
+            Token::Identifier("xyz".to_owned()),
+            Token::Operator(Operator::Assign),
+            Token::Identifier("x".to_owned()),
+            Token::Operator(Operator::Add),
+            Token::Identifier("y".to_owned()),
+            Token::Operator(Operator::Add),
+            Token::Identifier("z".to_owned()),
+            Token::Punctuation(Punctuation::Semicolon),
             Token::Identifier("print".to_owned()),
             Token::Punctuation(Punctuation::LeftParen),
-            Token::Identifier("z".to_owned()),
+            Token::Identifier("xyz".to_owned()),
             Token::Punctuation(Punctuation::RightParen),
             Token::Punctuation(Punctuation::Semicolon),
         ];
 
         let result = lex(r#"
-            let $x = 10;
-            let $y = 11;
-            let $z = $x + $y;
-            $print($z);
+            let x = 10;
+            let y = 11;
+            let z = x + y;
+            let xyz = x + y + z;
+            print(xyz);
             "#
         .to_owned());
 
