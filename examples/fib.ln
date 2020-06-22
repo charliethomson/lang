@@ -1,0 +1,13 @@
+
+
+let $x, $y, $z;
+
+while true {
+    $x, $y = 0, 1;
+    while $z < 255 {
+        $print($z);
+        $z = $x + $y;
+        $x = $y;
+        $y = $z;
+    }
+}
