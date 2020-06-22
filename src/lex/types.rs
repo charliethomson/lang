@@ -1,10 +1,10 @@
 use regex::Regex;
 use std::convert::TryFrom;
 
-pub const NUMBER_REGEX_STR: &str = r"[-.0-9]+";
-pub const BOOLEAN_REGEX_STR: &str = r"(true)|(false)";
-pub const STRING_REGEX_STR: &str = r#"(".*")|('.*')"#;
-pub const IDENT_REGEX_STR: &str = r"^\$[_a-zA-Z0-9]+";
+pub const NUMBER_REGEX_STR: &str = r"^[-.0-9]+";
+pub const BOOLEAN_REGEX_STR: &str = r"^(true)|(false)";
+pub const STRING_REGEX_STR: &str = r#"(^".*"$)|(^'.*'$)"#;
+pub const IDENT_REGEX_STR: &str = r"^[_a-zA-Z0-9]+";
 pub type TokenStream = Vec<Token>;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -110,7 +110,7 @@ pub struct Literal {
 }
 impl ToString for Literal {
     fn to_string(&self) -> String {
-        format!("{}", self.literal)
+        self.literal.to_string()
     }
 }
 impl TryFrom<&String> for Literal {

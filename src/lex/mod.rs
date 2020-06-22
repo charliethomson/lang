@@ -1,8 +1,6 @@
 pub mod types;
 use std::{convert::TryFrom, str::Chars};
-use types::{
-    Keyword, Literal, LiteralType, Operator, Punctuation, Token, TokenStream, IDENT_REGEX_STR,
-};
+use types::{Token, TokenStream};
 
 fn is_valid_ident_char(c: char) -> bool {
     match c {
@@ -12,11 +10,10 @@ fn is_valid_ident_char(c: char) -> bool {
 }
 
 fn scan_number(c: char, chars: Chars<'_>) -> Option<(Token, usize)> {
-    let mut chars = chars;
     let mut buffer = c.to_string();
 
     let good_chars = "1234567890.";
-    while let Some(c) = chars.next() {
+    for c in chars {
         if good_chars.contains(c) && !c.is_whitespace() {
             buffer.push(c);
         } else {
@@ -25,16 +22,15 @@ fn scan_number(c: char, chars: Chars<'_>) -> Option<(Token, usize)> {
     }
 
     match Token::try_from(&buffer) {
-        Ok(tok) => Some((tok, buffer.len().checked_sub(2).unwrap_or(0))),
+        Ok(tok) => Some((tok, buffer.len().saturating_sub(2))),
         Err(_) => None,
     }
 }
 
 fn scan_string(c: char, chars: Chars<'_>) -> Option<(Token, usize)> {
-    let mut chars = chars;
     let mut buffer = c.to_string();
 
-    while let Some(c) = chars.next() {
+    for c in chars {
         buffer.push(c);
         if c == '\'' || c == '"' {
             break;
@@ -42,52 +38,34 @@ fn scan_string(c: char, chars: Chars<'_>) -> Option<(Token, usize)> {
     }
 
     match Token::try_from(&buffer) {
-        Ok(tok) => Some((tok, buffer.len().checked_sub(2).unwrap_or(0))),
+        Ok(tok) => Some((tok, buffer.len().saturating_sub(2))),
         Err(_) => None,
     }
 }
 
-fn scan_ident(chars: Chars<'_>) -> Option<(Token, usize)> {
-    let mut chars = chars;
-    let mut buffer = String::new();
-
-    while let Some(c) = chars.next() {
-        if let Ok(tok) = Token::try_from(&buffer) {
-            return Some((tok, buffer.len() - 1));
-        } else if is_valid_ident_char(c) {
-            buffer.push(c);
-        } else {
-            break;
-        }
-    }
-
-    Some((Token::Identifier(buffer.clone()), buffer.len() - 1))
-}
-
 fn scan(c: char, chars: Chars<'_>) -> (Token, usize) {
-    let mut chars = chars;
     let mut buffer = c.to_string();
 
-    while let Some(c) = chars.next() {
+    for c in chars {
         if c.is_whitespace() {
             break;
         } else if let Ok(tok) = Token::try_from(&buffer) {
-            return (tok, buffer.len() - 2);
+            return (tok, buffer.len().saturating_sub(2));
         } else if !is_valid_ident_char(c) {
             return (
                 Token::Identifier(buffer.clone()),
-                buffer.len().checked_sub(2).unwrap_or(0),
+                buffer.len().saturating_sub(2),
             );
         } else {
             buffer.push(c);
         }
     }
     if let Ok(tok) = Token::try_from(&buffer) {
-        (tok, buffer.len() - 2)
+        (tok, buffer.len().saturating_sub(2))
     } else {
         (
             Token::Identifier(buffer.clone()),
-            buffer.len().checked_sub(2).unwrap_or(0),
+            buffer.len().saturating_sub(2),
         )
     }
 }
@@ -96,13 +74,7 @@ pub fn lex(input: String) -> TokenStream {
     let mut chars = input.chars();
     let mut tokens: TokenStream = Vec::new();
 
-    let mut c: char;
-    loop {
-        c = match chars.next() {
-            Some(c) => c,
-            None => break,
-        };
-
+    while let Some(c) = chars.next() {
         if c.is_whitespace() {
             continue;
         } else if c.is_numeric() {
@@ -112,7 +84,6 @@ pub fn lex(input: String) -> TokenStream {
                 // :shrug: lol
                 chars.nth(amt);
                 tokens.push(tok);
-            } else {
             }
         } else if let Ok(tok) = Token::try_from(&c.to_string()) {
             tokens.push(tok);
@@ -122,7 +93,6 @@ pub fn lex(input: String) -> TokenStream {
                     chars.nth(amt);
                 }
                 tokens.push(tok);
-            } else {
             }
         } else {
             let (tok, amt) = scan(c, chars.clone());
@@ -139,6 +109,7 @@ pub fn lex(input: String) -> TokenStream {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use types::{Keyword, Literal, LiteralType, Operator, Punctuation, Token};
     #[test]
     fn test_scan_string() {
         let test_str = "'Hello World!'aaaaaa".to_owned();
@@ -190,6 +161,12 @@ pub mod tests {
         let c = chars.next().unwrap();
         let res = scan(c, chars.clone());
         assert_eq!(res.0, Token::Keyword(Keyword::For),);
+        chars.nth(res.1);
+        let test_str = "apple1, apple2 = 1.2, 2.4;";
+        let mut chars = test_str.chars();
+        let c = chars.next().unwrap();
+        let res = scan(c, chars.clone());
+        assert_eq!(res.0, Token::Identifier("apple1".to_owned()),);
         chars.nth(res.1);
     }
     #[test]

@@ -1,6 +1,5 @@
 pub mod execute;
 pub mod lex;
-use std::convert::TryFrom;
 pub mod parse;
 
 fn main() {
