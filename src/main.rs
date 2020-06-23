@@ -7,17 +7,17 @@ fn main() {
         "{:#?}",
         lex::lex(
             r#"
-let xyz, y, z;
-
-while true {
+let x, y, z;
+while (true) {
     x, y = 0, 1;
-    while z < 255 {
+    while (z <= 255) {
         print(z);
         z = x + y;
         x = y;
         y = z;
     }
-}"#
+}
+            "#
             .to_owned(),
         )
     )

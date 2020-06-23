@@ -9,6 +9,13 @@ fn is_valid_ident_char(c: char) -> bool {
     }
 }
 
+fn is_valid_operator_char(c: char) -> bool {
+    match c {
+        '=' | '+' | '-' | '!' | '/' | '<' | '>' => true,
+        _ => false,
+    }
+}
+
 fn scan_number(c: char, chars: Chars<'_>) -> Option<(Token, usize)> {
     let mut buffer = c.to_string();
 
@@ -45,28 +52,58 @@ fn scan_string(c: char, chars: Chars<'_>) -> Option<(Token, usize)> {
 
 fn scan(c: char, chars: Chars<'_>) -> (Token, usize) {
     let mut buffer = c.to_string();
+    let ty = if is_valid_ident_char(c) {
+        'i'
+    } else if is_valid_operator_char(c) {
+        'o'
+    } else {
+        'e'
+    };
 
     for c in chars {
-        if c.is_whitespace() {
-            break;
-        } else if let Ok(tok) = Token::try_from(&buffer) {
-            return (tok, buffer.len().saturating_sub(2));
-        } else if !is_valid_ident_char(c) {
-            return (
-                Token::Identifier(buffer.clone()),
-                buffer.len().saturating_sub(2),
-            );
-        } else {
-            buffer.push(c);
+        match ty {
+            'i' => {
+                if is_valid_ident_char(c) {
+                    buffer.push(c);
+                } else {
+                    break;
+                }
+            }
+            'o' => {
+                if is_valid_operator_char(c) {
+                    buffer.push(c);
+                } else {
+                    break;
+                }
+            }
+            _ => {
+                if let Err(_) = Token::try_from(&buffer) {
+                    buffer.push(c)
+                } else {
+                    break;
+                }
+            }
         }
     }
-    if let Ok(tok) = Token::try_from(&buffer) {
-        (tok, buffer.len().saturating_sub(2))
-    } else {
-        (
-            Token::Identifier(buffer.clone()),
-            buffer.len().saturating_sub(2),
-        )
+
+    match ty {
+        'o' => {
+            if let Ok(tok) = Token::try_from(&buffer) {
+                (tok, buffer.len().saturating_sub(1))
+            } else {
+                panic!("Unable to tokenize buffer: {}", buffer);
+            }
+        }
+        _ => {
+            if let Ok(tok) = Token::try_from(&buffer) {
+                (tok, buffer.len().saturating_sub(1))
+            } else {
+                (
+                    Token::Identifier(buffer.clone()),
+                    buffer.len().saturating_sub(2),
+                )
+            }
+        }
     }
 }
 
@@ -79,14 +116,14 @@ pub fn lex(input: String) -> TokenStream {
             continue;
         } else if c.is_numeric() {
             if let Some((tok, amt)) = scan_number(c, chars.clone()) {
-                // Slightly weird behaviour, `nth` consumes `amt` elements of the iterator and yeilds the `amt`'th one.
-                // So this is equivalent to chars.skip(amt), but it doesn't consume the iterator and return a Skip
-                // :shrug: lol
-                chars.nth(amt);
+                if amt != 0 {
+                    // Slightly weird behaviour, `nth` consumes `amt` elements of the iterator and yeilds the `amt`'th one.
+                    // So this is equivalent to chars.skip(amt), but it doesn't consume the iterator and return a Skip
+                    // :shrug: lol
+                    chars.nth(amt);
+                }
                 tokens.push(tok);
             }
-        } else if let Ok(tok) = Token::try_from(&c.to_string()) {
-            tokens.push(tok);
         } else if c == '"' || c == '\'' {
             if let Some((tok, amt)) = scan_string(c, chars.clone()) {
                 if amt != 0 {
