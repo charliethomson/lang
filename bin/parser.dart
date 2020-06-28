@@ -47,11 +47,27 @@ enum NodeTy {
 
   Literal,
 
+  Obj,
+
   Null,
 
   Return,
   // Children: stmts, null
 
+}
+
+class RangeCollection {
+  int start;
+  int stop;
+  int step;
+
+  RangeCollection(this.start, this.stop, this.step);
+}
+
+class ElemCollection {
+  List<Token> els;
+
+  ElemCollection(this.els);
 }
 
 Node parse(List<Token> toks) {
