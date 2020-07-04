@@ -33,8 +33,44 @@ class Token {
 
   bool get hasTy => ty != null;
 
+  bool get isOperation => [
+        '+',
+        '-',
+        '*',
+        '/',
+        '^',
+        '%',
+        '+=',
+        '-=',
+        '*=',
+        '/=',
+        '^=',
+        '%=',
+      ].contains(literal);
+
+  bool get isBooleanOperation => [
+        '=',
+        '<',
+        '<=',
+        '==',
+        '>=',
+        '>',
+        '!=',
+      ].contains(literal);
+
+  bool get isBinaryOperation => [
+        '++',
+        '--',
+      ].contains(literal);
+
+  bool get isBang => literal == '!';
+
   bool operator ==(other) =>
       other is Token && (other.literal == literal && other.ty == ty);
+
+  bool get isValidOperatorTy =>
+      [TokenTy.Literal, TokenTy.Identifier, TokenTy.Operator].contains(ty) ||
+      this.isOperation;
 }
 
 bool isKeyword(String literal) {
@@ -114,15 +150,20 @@ bool isLiteral(String literal) {
 }
 
 dynamic parseLiteral(String literal) {
-  var tryDouble = double.tryParse(literal);
-  if (tryDouble != null) {
-    return tryDouble;
-  } else if (literal == 'true') {
+  if (literal == 'true') {
     return true;
   } else if (literal == 'false') {
     return false;
   } else {
-    return literal;
+    int tryInt = int.tryParse(literal);
+    double tryDouble = double.tryParse(literal);
+    if (tryInt != null) {
+      return tryInt;
+    } else if (tryDouble != null) {
+      return tryDouble;
+    } else {
+      return literal;
+    }
   }
 }
 

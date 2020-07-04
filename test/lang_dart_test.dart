@@ -1,5 +1,6 @@
 import 'package:quiver/iterables.dart';
 import '../bin/lexer.dart';
+import '../bin/parser.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -167,4 +168,25 @@ void main() {
     assert(res.isNotEmpty);
     assert(zip([res, expected_toks]).every((pair) => pair[0] == pair[1]));
   });
+
+  test('node thing', () {
+    print(parseFunctionDecl(lex('function(a,b) { return a + b }'), 0)
+        .item1
+        .formatString(0));
+  });
 }
+
+/*
+        functiondecl
+      /         \ (body)
+    stmts       stmts --
+  /     \         |     \
+a       stmts   return - null
+        /   \     |
+      b     null  operation(+)
+                  /    \
+                a       b
+
+    
+
+*/
