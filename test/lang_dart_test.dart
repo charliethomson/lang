@@ -126,13 +126,13 @@ void main() {
 
   test('lex_multiline', () {
     var input_str = '''
-  let x = 10;
-  let y = 0;
-  while ( y < x ) {
-    y += 1;
-  }
-  print(y);
-  ''';
+        let x = 10;
+        let y = 0;
+        while ( y < x ) {
+                y += 1;
+        }
+        print(y);
+        ''';
 
     var expected_toks = [
       Token('let'),
@@ -170,23 +170,50 @@ void main() {
   });
 
   test('node thing', () {
-    print(parseFunctionDecl(lex('function(a,b) { return a + b }'), 0)
-        .item1
-        .formatString(0));
+    var res = parse(lex('let foo = function(a,b) { return a + b }'));
+    print(res.item1.formatString(0));
   });
 }
-
 /*
-        functiondecl
-      /         \ (body)
-    stmts       stmts --
-  /     \         |     \
-a       stmts   return - null
-        /   \     |
-      b     null  operation(+)
-                  /    \
-                a       b
 
-    
 
+          stmts
+          /   \
+        Assn  null
+      /     \
+    foo     stmts
+          /     \
+        fndecl  null
+      /     \--------->\
+    stmts             stmts
+  /     \            /     \
+a       stmts     return  operation(+)
+      /     \             /     \
+    b       null         a       b
+
+
+
+
+
+
+  NodeTy.Stmts:null
+NodeTy.Stmts:null
+      NodeTy.Stmts:null
+    NodeTy.Stmts:null
+            NodeTy.Stmts:null
+          NodeTy.Stmts:null
+              NodeTy.Identifier:b
+            NodeTy.Operation:+
+              NodeTy.Identifier:a
+        NodeTy.Stmts:null
+          NodeTy.Return:null
+            NodeTy.Stmts:null
+      NodeTy.FunctionDecl:null
+            NodeTy.Stmts:null
+          NodeTy.Stmts:null
+            NodeTy.Identifier:b
+        NodeTy.Stmts:null
+          NodeTy.Identifier:a
+  NodeTy.Assignment:null
+    NodeTy.Identifier:foo
 */

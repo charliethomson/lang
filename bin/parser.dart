@@ -18,14 +18,20 @@ class Node {
 
   String formatString(int indent) {
     String buffer = '';
-    if (this.left != null)
-      buffer += 'lhs: ${this.left.formatString(indent + 4)}';
-    if (this.right != null)
-      buffer += 'rhs: ${this.right.formatString(indent + 4)}';
-    if (indent != 0) {
-      buffer += ' ' * indent;
+
+    indent += 2;
+
+    if (this.right != null) {
+      buffer += this.right.formatString(indent);
     }
-    buffer += '${this.ty} -> ${this.ty}\n';
+
+    buffer += '\n';
+
+    buffer += ' ' * (indent - 2);
+
+    buffer += '${this.ty}:${this.self}';
+
+    if (this.left != null) buffer += this.left.formatString(indent);
 
     return buffer;
   }
@@ -134,7 +140,42 @@ Tuple2<Node, int> parseOperation(List<Token> toks, int cursor) {
   return Tuple2(root, cursor);
 }
 
-Tuple2<Node, int> parseAssignment(List<Token> toks, int cursor) {}
+Tuple2<Node, int> parseAssignment(List<Token> toks, int cursor) {
+  // let foo = 10;
+  // called when `cursor` on "let"
+  Token tok = toks[cursor];
+  if (tok.literal != 'let') {
+    throw 'Entered unreachable code in parseAssignment (e.c 8) (${tok.literal})';
+  }
+
+  if (toks
+      .skip(cursor)
+      .takeWhile((value) => value.literal != '=')
+      .map((e) => e.literal)
+      .contains(',')) {
+    return parseMultiAssignment(toks, cursor);
+  }
+
+  Token lhs = toks[++cursor];
+  Node lhsNode = Node.withSelf(toNodeTy(lhs.ty), lhs.literal);
+
+  // Skip the =
+  cursor++;
+
+  List<Token> rhs =
+      toks.skip(cursor).takeWhile((value) => value.literal != ';').toList();
+
+  Tuple2 res = parse(toks.sublist(++cursor));
+  Node rhsNode = res.item1;
+  cursor += res.item2;
+
+  Node root = Node(NodeTy.Assignment);
+  root.left = lhsNode;
+  root.right = rhsNode;
+
+  return Tuple2(root, cursor);
+}
+
 Tuple2<Node, int> parseMultiAssignment(List<Token> toks, int cursor) {}
 Tuple2<Node, int> parseCollection(List<Token> toks, int cursor) {}
 Tuple2<Node, int> parseCondition(List<Token> toks, int cursor) {}
@@ -237,13 +278,14 @@ Tuple2<Node, int> parse(List<Token> toks) {
 
         switch (curTok.literal) {
           case '(':
-          case ')':
-          case '{':
-          case '}':
+            if (last == TokenTy.Identifier) {
+              // function call
+            }
+            break;
           case '[':
-          case ']':
-          case ';':
-          case ',':
+            if (last == TokenTy.Identifier) {
+              // index
+            }
             break;
         }
 
