@@ -144,11 +144,10 @@ List<Token> toRPN(List<Token> toks) {
             case ')':
               while (stack.isNotEmpty) {
                 Token top = stack.removeLast();
-                switch (top.literal) {
-                  case '(':
-                    break;
-                  default:
-                    output.add(top);
+                if (top.literal == '(') {
+                  break;
+                } else {
+                  output.add(top);
                 }
               }
               break;
@@ -276,10 +275,14 @@ Tuple2<Node, int> parseAssignment(List<Token> toks, int cursor) {
   return Tuple2(root, cursor);
 }
 
+// TODO: Kill self
 Tuple2<Node, int> parseMultiAssignment(List<Token> toks, int cursor) {}
 Tuple2<Node, int> parseCollection(List<Token> toks, int cursor) {}
 Tuple2<Node, int> parseCondition(List<Token> toks, int cursor) {}
 Tuple2<Node, int> parseWhile(List<Token> toks, int cursor) {}
+Tuple2<Node, int> parseFunctionCall(List<Token> toks, int cursor) {}
+// TODO: Kill self again
+
 Tuple2<Node, int> parseFunctionDecl(List<Token> toks, int cursor) {
   // let foo = function(a, b) { return a + b; }
   // called when `cursor` on "function"
@@ -357,8 +360,6 @@ Tuple2<Node, int> parseFunctionDecl(List<Token> toks, int cursor) {
   return Tuple2(root, cursor + res.item2);
 }
 
-Tuple2<Node, int> parseFunctionCall(List<Token> toks, int cursor) {}
-
 Tuple2<Node, int> parseStmt(List<Token> toks) {
   int cursor = 0;
   int buffer = 0;
@@ -419,8 +420,6 @@ Tuple2<Node, int> parseStmt(List<Token> toks) {
           case 'function':
             return parseFunctionDecl(toks, cursor);
           case 'return':
-            // TODO
-            // This is probably a bug, please look
             List<Token> returnExpr = [];
             curTok = toks[++cursor];
             while (curTok.literal != ';' && (++cursor <= toks.length)) {
@@ -445,7 +444,6 @@ Tuple2<Node, int> parseStmt(List<Token> toks) {
 }
 
 Node parse(List<Token> toks) {
-  // TODO: fix this
   int cursor = 0;
   Node root = Node(NodeTy.Stmts);
   Node curNode = root;
