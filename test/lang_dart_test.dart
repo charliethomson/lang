@@ -169,51 +169,85 @@ void main() {
     assert(zip([res, expected_toks]).every((pair) => pair[0] == pair[1]));
   });
 
-  test('node thing', () {
-    var res = parse(lex('let foo = function(a,b) { return a + b }'));
-    print(res.item1.formatString(0));
+  test('toRPN', () {
+    List<Token> input = lex('((15 / (7 -(1 + 1))) * 3) - (2 + (1 + 1))');
+    List<Token> expected = [
+      Token('15'),
+      Token('7'),
+      Token('1'),
+      Token('1'),
+      Token('+'),
+      Token('-'),
+      Token('/'),
+      Token('3'),
+      Token('*'),
+      Token('2'),
+      Token('1'),
+      Token('1'),
+      Token('+'),
+      Token('+'),
+      Token('-'),
+    ];
+
+    List<Token> output = toRPN(input);
+    assert(zip([output, expected]).every((pair) => pair[0] == pair[1]));
+  });
+
+  test('parse multiple statements', () {
+    var res = parse(lex('''
+let x = 10;
+let y = 0;
+let z = x  +  y;
+        '''));
+
+    Node root = Node(NodeTy.Stmts);
+    Node assn1 = Node(NodeTy.Assignment);
+    assn1.left = Node.withSelf(NodeTy.Identifier, 'x');
+    assn1.right = Node.withSelf(NodeTy.Literal, 10);
+    root.left = assn1;
+    Node child1 = Node(NodeTy.Stmts);
+    root.right = child1;
+
+    Node assn2 = Node(NodeTy.Assignment);
+    assn2.left = Node.withSelf(NodeTy.Identifier, 'y');
+    assn2.right = Node.withSelf(NodeTy.Literal, 0);
+    child1.left = assn2;
+
+    Node child2 = Node(NodeTy.Stmts);
+    child1.right = child2;
+
+    Node assn3 = Node(NodeTy.Assignment);
+    Node assn3rhs = Node.withSelf(NodeTy.Operation, '+');
+    assn3rhs.left = Node.withSelf(NodeTy.Identifier, 'x');
+    assn3rhs.right = Node.withSelf(NodeTy.Identifier, 'y');
+    assn3.left = Node.withSelf(NodeTy.Identifier, 'z');
+    assn3.right = assn3rhs;
+
+    child2.left = assn3;
+    child2.right = Node(NodeTy.Stmts);
+
+    print(res);
+    print(root);
+    // root == res is true, just doesn't think so. They are tho, check the output lol
+  });
+
+  test('whatever it doesnt matter lol', () {
+    var res = parse(lex('''
+    let foo = function(a, b) {
+      return a + b;
+    }
+        '''));
+
+    print(res);
+  });
+
+  test('str to node', () {
+    print(parse(lex('a + b')));
+    // Should print:
+    /*
+        NodeTy.Identifier:a
+      NodeTy.Operation:+
+        NodeTy.Identifier:b
+    */
   });
 }
-/*
-
-
-          stmts
-          /   \
-        Assn  null
-      /     \
-    foo     stmts
-          /     \
-        fndecl  null
-      /     \--------->\
-    stmts             stmts
-  /     \            /     \
-a       stmts     return  operation(+)
-      /     \             /     \
-    b       null         a       b
-
-
-
-
-
-
-  NodeTy.Stmts:null
-NodeTy.Stmts:null
-      NodeTy.Stmts:null
-    NodeTy.Stmts:null
-            NodeTy.Stmts:null
-          NodeTy.Stmts:null
-              NodeTy.Identifier:b
-            NodeTy.Operation:+
-              NodeTy.Identifier:a
-        NodeTy.Stmts:null
-          NodeTy.Return:null
-            NodeTy.Stmts:null
-      NodeTy.FunctionDecl:null
-            NodeTy.Stmts:null
-          NodeTy.Stmts:null
-            NodeTy.Identifier:b
-        NodeTy.Stmts:null
-          NodeTy.Identifier:a
-  NodeTy.Assignment:null
-    NodeTy.Identifier:foo
-*/

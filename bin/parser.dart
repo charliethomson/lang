@@ -16,29 +16,33 @@ class Node {
   Node(this.ty);
   Node.withSelf(this.ty, this.self);
 
-  String formatString(int indent) {
+  bool operator ==(other) =>
+      other is Node &&
+      this.left == other.left &&
+      this.right == other.right &&
+      this.self == other.self;
+
+  @override
+  String toString({int indent = 0}) {
     String buffer = '';
 
     indent += 2;
 
     if (this.right != null) {
-      buffer += this.right.formatString(indent);
+      buffer += this.right.toString(indent: indent);
     }
 
     buffer += '\n';
 
     buffer += ' ' * (indent - 2);
+    buffer += '${this.ty}';
+    if (this.self != null) {
+      buffer += ':${this.self}';
+    }
 
-    buffer += '${this.ty}:${this.self}';
-
-    if (this.left != null) buffer += this.left.formatString(indent);
+    if (this.left != null) buffer += this.left.toString(indent: indent);
 
     return buffer;
-  }
-
-  void addRLChild(Node child) {
-    this.right = Node(NodeTy.Stmts);
-    this.right.left = child;
   }
 }
 
@@ -97,8 +101,107 @@ NodeTy toNodeTy(TokenTy ty) {
   return null;
 }
 
+List<Token> toRPN(List<Token> toks) {
+  List<Token> output = [];
+  List<Token> stack = [];
+
+  for (Token token in toks) {
+    switch (token.ty) {
+      case TokenTy.Literal:
+      case TokenTy.Identifier:
+        output.add(token);
+        break;
+      case TokenTy.Operator:
+        int p = token.precedence();
+
+        while (stack.isNotEmpty) {
+          Token top = stack.last;
+
+          if (top.isParen) {
+            break;
+          } else {
+            bool cond = token.isRightAssociative
+                ? top.precedence() <= p
+                : top.precedence() < p;
+
+            if (cond) {
+              break;
+            } else {
+              output.add(stack.removeLast());
+            }
+          }
+        }
+
+        stack.add(token);
+
+        break;
+      default:
+        if (token.isParen) {
+          switch (token.literal) {
+            case '(':
+              stack.add(token);
+              break;
+            case ')':
+              while (stack.isNotEmpty) {
+                Token top = stack.removeLast();
+                switch (top.literal) {
+                  case '(':
+                    break;
+                  default:
+                    output.add(top);
+                }
+              }
+              break;
+            default:
+          }
+        } else {
+          throw 'unexpected ${token.ty}: ${token.literal}';
+        }
+    }
+  }
+
+  while (stack.isNotEmpty) {
+    output.add(stack.removeLast());
+  }
+
+  return output;
+}
+
+Node RPNtoNode(List<Token> rpnToks) {
+  List<Node> stack = [];
+
+  for (Token token in rpnToks) {
+    switch (token.ty) {
+      case TokenTy.Literal:
+      case TokenTy.Identifier:
+        stack.add(Node.withSelf(toNodeTy(token.ty), token.literal));
+        break;
+      case TokenTy.Operator:
+        Node node = Node.withSelf(NodeTy.Operation, token.literal);
+        if (stack.isEmpty) {
+          throw 'stack shouldnt be empty';
+        }
+        Node lhs = stack.removeLast();
+        Node rhs = stack.removeLast();
+
+        node.left = lhs;
+        node.right = rhs;
+
+        stack.add(node);
+        break;
+      default:
+        throw 'unexpected ${token.ty}: ${token.literal}';
+    }
+  }
+
+  if (stack.isEmpty) {
+    throw 'stack should not be empty';
+  } else {
+    return stack.removeLast();
+  }
+}
+
 Tuple2<Node, int> parseOperation(List<Token> toks, int cursor) {
-  Node root = Node(NodeTy.Operation);
   List<Token> opToks = [];
   Token tok = toks[cursor];
 
@@ -111,31 +214,8 @@ Tuple2<Node, int> parseOperation(List<Token> toks, int cursor) {
     }
   }
 
-  Token lhsTok = opToks[0];
-  NodeTy nodeTy = toNodeTy(lhsTok.ty);
-  if (![NodeTy.Literal, NodeTy.Identifier]
-      .contains(nodeTy != null ? nodeTy : NodeTy.If)) {
-    throw 'Unparsable lhs: ${lhsTok.literal}';
-  }
-  Node lhs = Node.withSelf(nodeTy, lhsTok.literal);
-
-  Token rhsTok = opToks[2];
-  nodeTy = toNodeTy(rhsTok.ty);
-  if (![NodeTy.Literal, NodeTy.Identifier]
-      .contains(nodeTy != null ? nodeTy : NodeTy.If)) {
-    throw 'Unparsable rhs: ${rhsTok.literal}';
-  }
-  Node rhs = Node.withSelf(nodeTy, rhsTok.literal);
-
-  Token opTok = opToks[1];
-  nodeTy = toNodeTy(opTok.ty);
-  if (nodeTy != NodeTy.Operation) {
-    throw 'Unknown operator ${opTok.literal}';
-  }
-
-  root.self = opTok.literal;
-  root.left = lhs;
-  root.right = rhs;
+  List<Token> rpnToks = toRPN(opToks);
+  Node root = RPNtoNode(rpnToks);
 
   return Tuple2(root, cursor);
 }
@@ -162,10 +242,30 @@ Tuple2<Node, int> parseAssignment(List<Token> toks, int cursor) {
   // Skip the =
   cursor++;
 
-  List<Token> rhs =
-      toks.skip(cursor).takeWhile((value) => value.literal != ';').toList();
+  bool requiresSemicolon = true;
+  int depth = 0;
+  List<Token> rhs = [];
 
-  Tuple2 res = parse(toks.sublist(++cursor));
+  while (++cursor < toks.length) {
+    Token tok = toks[cursor];
+
+    if (tok.literal == ';' && requiresSemicolon) {
+      break;
+    } else if (tok.literal == '{') {
+      requiresSemicolon = false;
+      depth++;
+    } else if (tok.literal == '}') {
+      depth--;
+    }
+
+    rhs.add(tok);
+
+    if (!requiresSemicolon && depth == 0) {
+      break;
+    }
+  }
+
+  Tuple2 res = parseStmt(rhs);
   Node rhsNode = res.item1;
   cursor += res.item2;
 
@@ -229,7 +329,9 @@ Tuple2<Node, int> parseFunctionDecl(List<Token> toks, int cursor) {
     if (depth <= 0) break;
 
     body.add(tok);
-    tok = toks[++cursor];
+    if (++cursor >= toks.length) break;
+
+    tok = toks[cursor];
   }
 
   Node root = Node(NodeTy.FunctionDecl);
@@ -247,7 +349,7 @@ Tuple2<Node, int> parseFunctionDecl(List<Token> toks, int cursor) {
     curLhs = curLhs.right;
   }
 
-  Tuple2<Node, int> res = parse(body);
+  Tuple2<Node, int> res = parseStmt(body);
 
   root.right = res.item1;
   root.left = lhs;
@@ -257,25 +359,19 @@ Tuple2<Node, int> parseFunctionDecl(List<Token> toks, int cursor) {
 
 Tuple2<Node, int> parseFunctionCall(List<Token> toks, int cursor) {}
 
-Tuple2<Node, int> parse(List<Token> toks) {
+Tuple2<Node, int> parseStmt(List<Token> toks) {
   int cursor = 0;
-  bool halt = false;
-  Node root = Node(NodeTy.Stmts);
-  Node curNode = root;
-
   int buffer = 0;
 
-  TokenTy last = TokenTy.Identifier;
+  Node node = null;
 
-  while (cursor < toks.length && !halt) {
+  TokenTy last = null;
+
+  while (cursor < toks.length) {
     Token curTok = toks[cursor];
     switch (curTok.ty) {
       case TokenTy.Punctuation:
         // TODO
-        if (last == TokenTy.Punctuation) {
-          throw 'Syntax error: Unexpected "${curTok.literal}"';
-        }
-
         switch (curTok.literal) {
           case '(':
             if (last == TokenTy.Identifier) {
@@ -294,6 +390,7 @@ Tuple2<Node, int> parse(List<Token> toks) {
         if (last == TokenTy.Identifier) {
           throw 'Syntax error: Unexpected identifier "${curTok.literal}"';
         }
+        node = Node.withSelf(NodeTy.Identifier, curTok.literal);
         buffer++;
 
         break;
@@ -303,70 +400,40 @@ Tuple2<Node, int> parse(List<Token> toks) {
         }
         buffer++;
 
-        Tuple2<Node, int> res = parseOperation(toks, cursor - buffer);
-        cursor += res.item2;
-        curNode.left = res.item1;
-        curNode.right = Node(NodeTy.Stmts);
-        curNode = curNode.right;
-
-        break;
+        int offs = cursor - buffer >= 0 ? cursor - buffer : 0;
+        return parseOperation(toks, offs);
       case TokenTy.Literal:
         if (last == TokenTy.Literal) {
           throw 'Syntax error: Unexpected literal "${curTok.literal}"';
         }
         buffer++;
+        node = Node.withSelf(NodeTy.Literal, curTok.literal);
         break;
       case TokenTy.Keyword:
         switch (curTok.literal) {
           // TODO: Impl the rest of the kws
           case 'let':
-            Tuple2<Node, int> res = parseAssignment(toks, cursor);
-            cursor += res.item2;
-            // Set the left child to the result
-            curNode.left = res.item1;
-            // Set and move to the new right child.
-            curNode.right = Node(NodeTy.Stmts);
-            curNode = curNode.right;
-            break;
+            return parseAssignment(toks, cursor);
           case 'while':
-            Tuple2<Node, int> res = parseWhile(toks, cursor);
-            cursor += res.item2;
-            // Set the left child to the result
-            curNode.left = res.item1;
-            // Set and move to the new right child.
-            curNode.right = Node(NodeTy.Stmts);
-            curNode = curNode.right;
-            break;
+            return parseWhile(toks, cursor);
           case 'function':
-            // Parse the function declaration
-            Tuple2<Node, int> res = parseFunctionDecl(toks, cursor);
-            cursor += res.item2;
-            // Set the left child to the result
-            curNode.left = res.item1;
-            // Set and move to the new right child.
-            curNode.right = Node(NodeTy.Stmts);
-            curNode = curNode.right;
-
-            break;
+            return parseFunctionDecl(toks, cursor);
           case 'return':
             // TODO
             // This is probably a bug, please look
             List<Token> returnExpr = [];
             curTok = toks[++cursor];
-            while (curTok.literal != ';' && !(cursor < toks.length - 1)) {
+            while (curTok.literal != ';' && (++cursor <= toks.length)) {
               returnExpr.add(curTok);
-              curTok = toks[++cursor];
+              curTok = toks[cursor];
             }
 
             Node returnNode = Node(NodeTy.Return);
-            Tuple2<Node, int> res = parse(returnExpr);
+            Tuple2<Node, int> res = parseStmt(returnExpr);
             returnNode.left = res.item1;
             cursor += res.item2;
-            curNode.left = returnNode;
-            curNode.right = Node(NodeTy.Stmts);
-            curNode = curNode.right;
-
-            break;
+            node = returnNode;
+            return Tuple2(node, cursor);
         }
     }
 
@@ -374,5 +441,48 @@ Tuple2<Node, int> parse(List<Token> toks) {
     cursor++;
   }
 
-  return Tuple2(root, cursor);
+  return Tuple2(node, cursor);
+}
+
+Node parse(List<Token> toks) {
+  // TODO: fix this
+  int cursor = 0;
+  Node root = Node(NodeTy.Stmts);
+  Node curNode = root;
+
+  while (cursor < toks.length) {
+    bool requiresSemicolon = true;
+    int depth = 0;
+    List<Token> passToks = [];
+
+    while (cursor < toks.length) {
+      Token tok = toks[cursor];
+
+      if (tok.literal == ';' && requiresSemicolon) {
+        break;
+      } else if (tok.literal == '{') {
+        requiresSemicolon = false;
+        depth++;
+      } else if (tok.literal == '}') {
+        depth--;
+      }
+
+      passToks.add(tok);
+
+      if (!requiresSemicolon && depth == 0) {
+        break;
+      }
+
+      cursor++;
+    }
+
+    Tuple2<Node, int> res = parseStmt(passToks);
+    // Skip the ;
+    cursor += 1;
+    curNode.left = res.item1;
+    curNode.right = Node(NodeTy.Stmts);
+    curNode = curNode.right;
+  }
+
+  return root;
 }

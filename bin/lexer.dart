@@ -69,8 +69,34 @@ class Token {
       other is Token && (other.literal == literal && other.ty == ty);
 
   bool get isValidOperatorTy =>
-      [TokenTy.Literal, TokenTy.Identifier, TokenTy.Operator].contains(ty) ||
+      [TokenTy.Literal, TokenTy.Identifier].contains(ty) ||
+      '()'.contains(literal) ||
       this.isOperation;
+
+  bool get isRightAssociative => literal == '^';
+
+  int precedence() {
+    switch (literal) {
+      case '+':
+      case '-':
+      case '+=':
+      case '-=':
+        return 2;
+      case '*':
+      case '/':
+      case '*=':
+      case '/=':
+        return 3;
+      case '^':
+        return 4;
+      case '%':
+        return 5;
+      default:
+        return 0;
+    }
+  }
+
+  bool get isParen => '()'.contains(literal);
 }
 
 bool isKeyword(String literal) {
