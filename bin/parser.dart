@@ -307,11 +307,26 @@ Tuple2<Node, int> parseAssignment(List<Token> toks, int cursor) {
 }
 
 // TODO: Kill self
-Tuple2<Node, int> parseMultiAssignment(List<Token> toks, int cursor) {}
-Tuple2<Node, int> parseCollection(List<Token> toks, int cursor) {}
-Tuple2<Node, int> parseCondition(List<Token> toks, int cursor) {}
-Tuple2<Node, int> parseWhile(List<Token> toks, int cursor) {}
+// TODO: Do this one next :) (for your mental health)
+Tuple2<Node, int> parseMultiAssignment(List<Token> toks, int cursor) {
+  // let a, b, c = 10, 11, 12;
+  // called when `cursor` on "let"
+}
+Tuple2<Node, int> parseCollection(List<Token> toks, int cursor) {
+  // EITHER
+  //
+  // OR
+}
+Tuple2<Node, int> parseCondition(List<Token> toks, int cursor) {
+  // if (a == b) { .. } else if ( a == c) { .. } else { .. }
+  // called when `cursor` on "if"
+}
+Tuple2<Node, int> parseWhile(List<Token> toks, int cursor) {
+  // while (let i = 0) : (i < 10) : (i++) { .. }
+  // called when `cursor` on "while"
+}
 // TODO: Kill self again
+
 Tuple2<Node, int> parseFunctionCall(List<Token> toks, int cursor) {
   // print("Hello World!");
   // called when `cursor` on "print"
