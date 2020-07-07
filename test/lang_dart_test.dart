@@ -241,13 +241,7 @@ let z = x  +  y;
     print(res);
   });
 
-  test('str to node', () {
-    print(parse(lex('a + b')));
-    // Should print:
-    /*
-        NodeTy.Identifier:a
-      NodeTy.Operation:+
-        NodeTy.Identifier:b
-    */
+  test('parseFunctionCall', () {
+    print(parse(lex('print(a + b, c, d); print("Hello world!");')));
   });
 }

@@ -35,7 +35,7 @@ class Node {
     buffer += '\n';
 
     buffer += ' ' * (indent - 2);
-    buffer += '${this.ty}';
+    buffer += '${nodeTyToString(this.ty)}';
     if (this.self != null) {
       buffer += ':${this.self}';
     }
@@ -99,6 +99,37 @@ NodeTy toNodeTy(TokenTy ty) {
       return null;
   }
   return null;
+}
+
+String nodeTyToString(NodeTy ty) {
+  switch (ty) {
+    case NodeTy.Stmts:
+      return 'Stmts';
+    case NodeTy.Operation:
+      return 'Operation';
+    case NodeTy.FunctionCall:
+      return 'FunctionCall';
+    case NodeTy.FunctionDecl:
+      return 'FunctionDecl';
+    case NodeTy.Assignment:
+      return 'Assignment';
+    case NodeTy.While:
+      return 'While';
+    case NodeTy.BooleanCondition:
+      return 'BooleanCondition';
+    case NodeTy.If:
+      return 'If';
+    case NodeTy.Literal:
+      return 'Literal';
+    case NodeTy.Identifier:
+      return 'Identifier';
+    case NodeTy.Object:
+      return 'Object';
+    case NodeTy.Collection:
+      return 'Collection';
+    case NodeTy.Return:
+      return 'Return';
+  }
 }
 
 List<Token> toRPN(List<Token> toks) {
@@ -280,14 +311,63 @@ Tuple2<Node, int> parseMultiAssignment(List<Token> toks, int cursor) {}
 Tuple2<Node, int> parseCollection(List<Token> toks, int cursor) {}
 Tuple2<Node, int> parseCondition(List<Token> toks, int cursor) {}
 Tuple2<Node, int> parseWhile(List<Token> toks, int cursor) {}
-Tuple2<Node, int> parseFunctionCall(List<Token> toks, int cursor) {}
 // TODO: Kill self again
+Tuple2<Node, int> parseFunctionCall(List<Token> toks, int cursor) {
+  // print("Hello World!");
+  // called when `cursor` on "print"
+
+  Token tok = toks[cursor];
+
+  if (tok.ty != TokenTy.Identifier) {
+    throw "Entered unreachable code in parseFunctionCall (e.c 5) (${tok.literal})";
+  }
+  Node lhs = Node.withSelf(NodeTy.Identifier, tok.literal);
+
+  tok = toks[++cursor];
+
+  if (tok.literal != '(') {
+    throw 'Syntax error: encountered ${tok.literal}, expected \'(\'';
+  }
+
+  List<Token> args = [];
+
+  while (++cursor < toks.length) {
+    tok = toks[cursor];
+    if (tok.literal == ')') {
+      break;
+    }
+
+    args.add(tok);
+  }
+
+  Node rhs = Node(NodeTy.Stmts);
+  Node curRhs = rhs;
+  int argsCursor = 0;
+
+  while (argsCursor < args.length) {
+    List<Token> argToks =
+        args.skip(argsCursor).takeWhile((el) => el.literal != ',').toList();
+
+    argsCursor += argToks.length + 1;
+
+    curRhs.left = parseStmt(argToks).item1;
+    curRhs.right = Node(NodeTy.Stmts);
+    curRhs = curRhs.right;
+  }
+
+  Node root = Node(NodeTy.FunctionCall);
+  root.left = lhs;
+  root.right = rhs;
+
+  return Tuple2(root, cursor + 2);
+}
 
 Tuple2<Node, int> parseFunctionDecl(List<Token> toks, int cursor) {
   // let foo = function(a, b) { return a + b; }
   // called when `cursor` on "function"
 
   Token tok = toks[cursor];
+
   if (tok.literal != 'function') {
     throw 'Entered unreachable code in parseFunctionDecl (e.c 1) (${tok.literal})';
   }
@@ -376,6 +456,7 @@ Tuple2<Node, int> parseStmt(List<Token> toks) {
         switch (curTok.literal) {
           case '(':
             if (last == TokenTy.Identifier) {
+              return parseFunctionCall(toks, cursor - 1);
               // function call
             }
             break;
