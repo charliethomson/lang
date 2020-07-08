@@ -1,3 +1,5 @@
+import 'package:quiver/iterables.dart';
+
 import 'lexer.dart';
 import 'package:tuple/tuple.dart';
 
@@ -64,6 +66,9 @@ enum NodeTy {
   Assignment,
   // Children: lhs, rhs
 
+  MultiAssignment,
+  // Children: Assignment, MultiAssignment
+
   While,
   // Children: cond, body
 
@@ -84,6 +89,7 @@ enum NodeTy {
   Return,
   // Children: stmts, null
 
+  Null,
 }
 
 NodeTy toNodeTy(TokenTy ty) {
@@ -129,6 +135,10 @@ String nodeTyToString(NodeTy ty) {
       return 'Collection';
     case NodeTy.Return:
       return 'Return';
+    case NodeTy.MultiAssignment:
+      return 'MultiAssignment';
+    case NodeTy.Null:
+      return 'Null';
   }
 }
 
@@ -306,12 +316,84 @@ Tuple2<Node, int> parseAssignment(List<Token> toks, int cursor) {
   return Tuple2(root, cursor);
 }
 
-// TODO: Kill self
-// TODO: Do this one next :) (for your mental health)
 Tuple2<Node, int> parseMultiAssignment(List<Token> toks, int cursor) {
   // let a, b, c = 10, 11, 12;
   // called when `cursor` on "let"
+
+  List<List<Token>> lhs = [];
+  List<List<Token>> rhs = [];
+
+  List<Token> cur = [];
+
+  bool inRhs = false;
+  while (++cursor < toks.length) {
+    Token tok = toks[cursor];
+
+    if (tok.literal == '=') {
+      if (inRhs) {
+        // throw
+      }
+      lhs.add(cur);
+      cur = [];
+      inRhs = true;
+    } else if (tok.literal == ',') {
+      if (inRhs) {
+        rhs.add(cur);
+      } else {
+        lhs.add(cur);
+      }
+
+      cur = [];
+    } else if (tok.literal == ';') {
+      if (inRhs) {
+        rhs.add(cur);
+      } else {
+        lhs.add(cur);
+      }
+      break;
+    } else {
+      cur.add(tok);
+    }
+  }
+
+  // Require that lhs and rhs are equal lengths. fill missing rhs values with `null`. Throw if lhs < rhs
+
+  if (lhs.length != rhs.length) {
+    if (lhs.length < rhs.length) {
+      // throw
+    } else {
+      while (lhs.length > rhs.length) {
+        rhs.add([null]);
+      }
+    }
+  }
+
+  List<Node> lhsNodes = lhs.map((toks) => parseStmt(toks).item1).toList();
+  List<Node> rhsNodes = rhs.map((toks) => parseStmt(toks).item1).toList();
+
+  Node root = Node(NodeTy.MultiAssignment);
+  Node current = root;
+  Node parent = root;
+
+  for (var tuple in zip([lhsNodes, rhsNodes])) {
+    var lhs = tuple[0];
+    var rhs = tuple[1];
+
+    Node assn = Node(NodeTy.Assignment);
+    assn.left = lhs;
+    assn.right = rhs;
+
+    current.left = assn;
+    current.right = Node(NodeTy.MultiAssignment);
+    parent = current;
+    current = current.right;
+  }
+
+  parent.right = null;
+
+  return Tuple2(root, cursor);
 }
+
 Tuple2<Node, int> parseCollection(List<Token> toks, int cursor) {
   // EITHER
   //
@@ -413,15 +495,10 @@ Tuple2<Node, int> parseFunctionDecl(List<Token> toks, int cursor) {
 
   int depth = 1;
   while (true) {
-    switch (tok.literal) {
-      case '{':
-        depth++;
-        break;
-      case '}':
-        depth--;
-        break;
-      default:
-        break;
+    if (tok.literal == '{') {
+      depth++;
+    } else if (tok.literal == '}') {
+      depth--;
     }
 
     if (depth <= 0) break;
@@ -465,6 +542,17 @@ Tuple2<Node, int> parseStmt(List<Token> toks) {
 
   while (cursor < toks.length) {
     Token curTok = toks[cursor];
+    if (curTok == null) {
+      if (node != null) {
+        node.left = Node(NodeTy.Null);
+        node.right = Node(NodeTy.Stmts);
+        node = node.right;
+      } else {
+        node = Node(NodeTy.Null);
+      }
+      cursor++;
+      continue;
+    }
     switch (curTok.ty) {
       case TokenTy.Punctuation:
         // TODO

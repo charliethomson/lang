@@ -232,13 +232,17 @@ let z = x  +  y;
   });
 
   test('whatever it doesnt matter lol', () {
-    var res = parse(lex('''
-    let foo = function(a, b) {
-      return a + b;
-    }
-        '''));
+    print(parseMultiAssignment(lex('''
+    let a, b, c = 1, 2, 3;
+        '''), 0).item1);
 
-    print(res);
+    print(parseMultiAssignment(lex('''
+    let a, b, c = 1, 3;
+        '''), 0).item1);
+
+    print(parseMultiAssignment(lex('''
+    let a, b, c;
+        '''), 0).item1);
   });
 
   test('parseFunctionCall', () {
