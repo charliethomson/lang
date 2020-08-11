@@ -39,7 +39,12 @@ class Node {
     buffer += ' ' * (indent - 2);
     buffer += '${nodeTyToString(this.ty)}';
     if (this.self != null) {
-      buffer += ':${this.self}';
+      if (this.self.runtimeType == Node) {
+        String childString = this.self.toString(indent: indent);
+        buffer += " " * indent + childString;
+      } else {
+        buffer += ':${this.self}';
+      }
     }
 
     if (this.left != null) buffer += this.left.toString(indent: indent);
@@ -71,6 +76,10 @@ enum NodeTy {
 
   While,
   // Children: cond, body
+
+  ComplexWhileCondition,
+  // while (Assignment; BooleanCondition; onEach)
+  // Children: Assignment, Stmts: BooleanCondition, Stmts (onEach)
 
   BooleanCondition,
   // Children: stmt (operation), stmts (null)
@@ -137,6 +146,8 @@ String nodeTyToString(NodeTy ty) {
       return 'Return';
     case NodeTy.MultiAssignment:
       return 'MultiAssignment';
+    case NodeTy.ComplexWhileCondition:
+      return 'ComplexWhileCondition';
     case NodeTy.Null:
       return 'Null';
   }
@@ -394,18 +405,120 @@ Tuple2<Node, int> parseMultiAssignment(List<Token> toks, int cursor) {
   return Tuple2(root, cursor);
 }
 
-Tuple2<Node, int> parseCollection(List<Token> toks, int cursor) {
-  // EITHER
-  //
-  // OR
-}
+Tuple2<Node, int> parseCollection(List<Token> toks, int cursor) {}
 Tuple2<Node, int> parseCondition(List<Token> toks, int cursor) {
   // if (a == b) { .. } else if ( a == c) { .. } else { .. }
   // called when `cursor` on "if"
 }
 Tuple2<Node, int> parseWhile(List<Token> toks, int cursor) {
-  // while (let i = 0) : (i < 10) : (i++) { .. }
+  // while (let i = 0; i < 10; i++) { <body?> }
+  // OR
+  // while (condition) { <body?> }
   // called when `cursor` on "while"
+
+  var parts = toks
+      .skip(cursor)
+      .skipWhile((value) => value.literal != '(')
+      .skip(1)
+      .takeWhile((value) => value.literal != ')')
+      .toList();
+
+  Node ret = Node(NodeTy.While);
+
+  if (parts.any((element) => element.literal == ';')) {
+    // CASE 1
+    // while (<assignment?>;<condition?>;<onEach?>) { <body?> }
+    var assignment = parts.takeWhile((value) => value.literal != ';').toList();
+    cursor += assignment.length + 1;
+
+    var condition =
+        parts.skip(cursor).takeWhile((value) => value.literal != ';').toList();
+    cursor += condition.length + 1;
+
+    var onEach =
+        parts.skip(cursor).takeWhile((value) => value.literal != ';').toList();
+    cursor += onEach.length + 1;
+
+    var assignmentResult = parseStmt(assignment);
+    var conditionResult = parseStmt(condition);
+    var onEachResult = parseStmt(onEach);
+
+    if ([assignmentResult, conditionResult, onEachResult]
+        .any((element) => element == null || element.item1 == null)) {
+      Node left = Node(NodeTy.ComplexWhileCondition);
+      left.left = assignmentResult != null && assignmentResult.item1 != null
+          ? assignmentResult.item1
+          : Node(NodeTy.Null);
+
+      Node right = Node(NodeTy.Null);
+      right.left = Node.withSelf(
+          NodeTy.BooleanCondition,
+          conditionResult != null && conditionResult.item1 != null
+              ? conditionResult.item1
+              : Node(NodeTy.Null));
+      right.right = onEachResult != null && onEachResult.item1 != null
+          ? onEachResult.item1
+          : Node(NodeTy.Null);
+      ;
+      left.right = right;
+
+      ret.left = left;
+      ret.right = null;
+    } else {
+      Node left = Node(NodeTy.ComplexWhileCondition);
+      left.left = assignmentResult.item1;
+
+      Node right = Node(NodeTy.Stmts);
+      right.left =
+          Node.withSelf(NodeTy.BooleanCondition, conditionResult.item1);
+      right.right = onEachResult.item1;
+
+      left.right = right;
+
+      ret.left = left;
+      ret.right = null;
+    }
+  } else {
+    // CASE 2
+    // while(<cond>) {<body?>}
+
+    var condResult = parseStmt(parts);
+    Node cond = condResult != null || condResult.item1 != null
+        ? condResult.item1
+        : Node(NodeTy.Null);
+
+    ret.left = Node.withSelf(NodeTy.BooleanCondition, cond);
+  }
+
+  // Body
+
+  List<Token> body = [];
+  int depth = 0;
+  for (var tok
+      in toks.skip(cursor).skipWhile((value) => value.literal != '{')) {
+    body.add(tok);
+    if (tok.literal == '{') {
+      depth++;
+    } else if (tok.literal == '}') {
+      depth--;
+    }
+
+    if (depth == 0) {
+      break;
+    }
+  }
+
+  cursor += body.length;
+
+  Node bodyResult = parse(body);
+
+  if (bodyResult != null) {
+    ret.right = bodyResult;
+  } else {
+    ret.right = Node(NodeTy.Null);
+  }
+
+  return Tuple2(ret, cursor);
 }
 // TODO: Kill self again
 
@@ -582,6 +695,8 @@ Tuple2<Node, int> parseStmt(List<Token> toks) {
       case TokenTy.Operator:
         if (last == TokenTy.Operator) {
           throw 'Syntax error: Unexpected operator "${curTok.literal}"';
+        } else if (last == TokenTy.Punctuation) {
+          buffer--;
         }
         buffer++;
 
@@ -634,6 +749,8 @@ Node parse(List<Token> toks) {
 
   while (cursor < toks.length) {
     bool requiresSemicolon = true;
+    bool inWhile = false;
+    bool ignoreTok = false;
     int depth = 0;
     List<Token> passToks = [];
 
@@ -642,14 +759,29 @@ Node parse(List<Token> toks) {
 
       if (tok.literal == ';' && requiresSemicolon) {
         break;
-      } else if (tok.literal == '{') {
-        requiresSemicolon = false;
-        depth++;
-      } else if (tok.literal == '}') {
-        depth--;
+      } else if (tok.literal == 'while') {
+        inWhile = true;
+      } else if (inWhile) {
+        if (tok.literal == '(') {
+          requiresSemicolon = false;
+          depth += 1;
+        } else if (tok.literal == '{') {
+          inWhile = false;
+          requiresSemicolon = false;
+          depth++;
+          ignoreTok = true;
+        }
+        // } else if (tok.literal == '{') {
+        //   requiresSemicolon = false;
+        //   depth++;
+        // } else if (tok.literal == '}') {
+        //   depth--;
       }
-
-      passToks.add(tok);
+      if (ignoreTok) {
+        ignoreTok = false;
+      } else {
+        passToks.add(tok);
+      }
 
       if (!requiresSemicolon && depth == 0) {
         break;

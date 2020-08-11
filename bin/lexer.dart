@@ -71,7 +71,8 @@ class Token {
   bool get isValidOperatorTy =>
       [TokenTy.Literal, TokenTy.Identifier].contains(ty) ||
       '()'.contains(literal) ||
-      this.isOperation;
+      this.isOperation ||
+      this.isBooleanOperation;
 
   bool get isRightAssociative => literal == '^';
 

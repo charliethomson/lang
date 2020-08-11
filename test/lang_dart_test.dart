@@ -248,4 +248,12 @@ let z = x  +  y;
   test('parseFunctionCall', () {
     print(parse(lex('print(a + b, c, d); print("Hello world!");')));
   });
+
+  test('parseWhile', () {
+    print(parse(lex('while (let a = 1; a < 10; a += 1)')));
+    print(parse(lex('while (;;)')));
+    print(parse(lex('while (let a = 10;a+=1)')));
+    print(parse(lex('while (;;) { print(a); print(a * a); }')));
+    print(parse(lex('while (true) { print("Infinite loop!"); }')));
+  });
 }
