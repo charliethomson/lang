@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:quiver/iterables.dart';
 import '../bin/lexer.dart';
 import '../bin/parser.dart';
@@ -277,5 +278,99 @@ let z = x  +  y;
     expected.right = Node(NodeTy.Null);
 
     assert(result == expected);
+  });
+  test('parseCondition', () {
+    print(parse(lex(
+        'if (a == b) { print("a == b"); } else { print("a != b"); } print("Hello World!");')));
+
+    print(parse(lex(
+        'if (a == b) { print("a == b"); a += b; } else if (a == c) { print("a == c"); } else { print("a != b && a != c"); } print("Hello World!");')));
+  });
+
+  test('getStmts', () {
+    // make sure we don't lose tokens
+    dynamic expected = "leta=10;letb=1;";
+    dynamic result = getStmts(lex("let a = 10 ; let b = 1 ;"))
+        .fold(
+            '',
+            (acc, cur) =>
+                acc + cur.fold('', (bcc, bur) => bcc + bur.literal.toString()))
+        .trim();
+
+    assert(expected == result);
+
+    var exp = [
+      [
+        Token.Identifier("print"),
+        Token("("),
+        Token('"Hello World!"'),
+        Token(")"),
+        Token(";"),
+      ],
+      [
+        Token('let'),
+        Token.Identifier('a'),
+        Token('='),
+        Token('"Hello World!"'),
+        Token(';')
+      ],
+      [
+        Token.Identifier('print'),
+        Token("("),
+        Token.Identifier('a'),
+        Token(")"),
+        Token(';')
+      ]
+    ];
+    var res = getStmts(
+        lex('print("Hello World!"); let a = "Hello World!"; print(a);'));
+
+    // List equality is a PAIN
+    // esp for milti dimensional ones
+    for (var i in zip([res, exp])) {
+      assert(ListEquality().equals(i[0], i[1]));
+    }
+
+    // conditional (the hard one :))
+    res = getStmts(
+        lex('if (a == b) { print(a); } else { print(b); } print(a + b);'));
+    exp = [
+      [
+        Token("if"),
+        Token("("),
+        Token.Identifier("a"),
+        Token("=="),
+        Token.Identifier("b"),
+        Token(")"),
+        Token("{"),
+        Token.Identifier('print'),
+        Token("("),
+        Token.Identifier("a"),
+        Token(")"),
+        Token(";"),
+        Token("}"),
+        Token("else"),
+        Token("{"),
+        Token.Identifier('print'),
+        Token("("),
+        Token.Identifier("b"),
+        Token(")"),
+        Token(";"),
+        Token("}"),
+      ],
+      [
+        Token.Identifier('print'),
+        Token("("),
+        Token.Identifier("a"),
+        Token("+"),
+        Token.Identifier('b'),
+        Token(")"),
+        Token(';')
+      ]
+    ];
+
+    for (var i in zip([res, exp])) {
+      assert(ListEquality().equals(i[0], i[1]));
+    }
   });
 }
