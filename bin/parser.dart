@@ -82,10 +82,9 @@ enum NodeTy {
   // Children: Assignment, Stmts: BooleanCondition, Stmts (onEach)
 
   BooleanCondition,
-  // Children: stmt (operation), stmts (null)
 
   If,
-  // Children: stmt (booleancondition), stmts (body, else/elseif)
+  // Children: stmts: (cond, body), if|null
 
   Literal,
 
@@ -167,6 +166,7 @@ List<Token> toRPN(List<Token> toks) {
         int p = token.precedence();
 
         while (stack.isNotEmpty) {
+          // List.last _can_ throw, but the above condition asserts that it never will
           Token top = stack.last;
 
           if (top.isParen) {
@@ -212,7 +212,11 @@ List<Token> toRPN(List<Token> toks) {
   }
 
   while (stack.isNotEmpty) {
-    output.add(stack.removeLast());
+    var toAdd = stack.removeLast();
+    if (toAdd.isParen) {
+      throw 'mismatched paren';
+    }
+    output.add(toAdd);
   }
 
   return output;
@@ -423,13 +427,109 @@ Tuple2<Node, int> parseMultiAssignment(List<Token> toks, int cursor) {
 Tuple2<Node, int> parseCollection(List<Token> toks, int cursor) {}
 Tuple2<Node, int> parseCondition(List<Token> toks, int cursor) {
   // if (a == b) { .. } else if ( a == c) { .. } else { .. }
+  /*
+        null
+      if
+          stmts:body
+        stmts
+          null
+      stmts:body
+    if
+      stmts     ident:a
+        operation:==
+                ident:c
+  if  stmts:body
+    stmts     ident:a
+      operation:==
+              ident:b
+  */
   // called when `cursor` on "if"
+  if (cursor >= toks.length || !toks[cursor].isConditionMarker) {
+    return null;
+  }
+
+  List<Token> condition = [];
+  List<Token> body = [];
+
+  // Skip to the first ( or {
+  while (!'({'.contains(toks[++cursor].literal.toString()));
+
+  bool inCond = toks[cursor].literal == '(';
+  int depth = 0;
+
+  while (cursor < toks.length) {
+    Token tok = toks[cursor];
+    bool skip = true;
+    switch (tok.literal) {
+      case '(':
+        if (depth == 0) {
+          inCond = true;
+        } else {
+          skip = false;
+        }
+        break;
+      case ')':
+        if (depth == 0) {
+          inCond = false;
+        } else {
+          skip = false;
+        }
+        break;
+      case '{':
+        depth++;
+        break;
+      case '}':
+        depth--;
+        break;
+      default:
+        skip = false;
+    }
+    if (skip) {
+      cursor++;
+      continue;
+    }
+
+    if (depth != 0 && inCond) {
+      throw 'Syntax Error: Possibly missing a closing paren on the condition there bud';
+    } else if (depth != 0) {
+      body.add(tok);
+    } else if (inCond) {
+      condition.add(tok);
+    } else {
+      break;
+    }
+    cursor++;
+  }
+
+  Node root = Node(NodeTy.If);
+  Node child = Node(NodeTy.Stmts);
+  child.left = condition.isNotEmpty
+      ? parseOperation(condition, 0).item1
+      : Node(NodeTy.Null);
+  child.right = body.isNotEmpty ? parse(body) : Node(NodeTy.Null);
+
+  root.left = child;
+  var res = parseCondition(toks, cursor);
+  if (res != null) {
+    root.right = res.item1;
+    cursor += res.item2;
+  } else {
+    root.right = Node(NodeTy.Null);
+  }
+
+  return Tuple2(root, cursor);
 }
+
+// TODO: Reformat
 Tuple2<Node, int> parseWhile(List<Token> toks, int cursor) {
   // while (let i = 0; i < 10; i++) { <body?> }
   // OR
   // while (condition) { <body?> }
   // called when `cursor` on "while"
+
+  if (cursor >= toks.length || toks[cursor].literal != "while") {
+    throw "unreachable (e.c 8, parseWhile)";
+  }
 
   var parts = toks
       .skip(cursor)
@@ -511,11 +611,12 @@ Tuple2<Node, int> parseWhile(List<Token> toks, int cursor) {
   int depth = 0;
   for (var tok
       in toks.skip(cursor).skipWhile((value) => value.literal != '{')) {
-    body.add(tok);
     if (tok.literal == '{') {
       depth++;
     } else if (tok.literal == '}') {
       depth--;
+    } else {
+      body.add(tok);
     }
 
     if (depth == 0) {
@@ -733,6 +834,10 @@ Tuple2<Node, int> parseStmt(List<Token> toks) {
             return parseWhile(toks, cursor);
           case 'function':
             return parseFunctionDecl(toks, cursor);
+          case 'if':
+          case 'elseif':
+          case 'else':
+            return parseCondition(toks, cursor);
           case 'return':
             List<Token> returnExpr = [];
             curTok = toks[++cursor];
@@ -757,57 +862,72 @@ Tuple2<Node, int> parseStmt(List<Token> toks) {
   return Tuple2(node, cursor);
 }
 
+List<List<Token>> getStmts(List<Token> code) {
+  int state = 0;
+
+  List<List<Token>> stmts = [];
+  List<Token> stmt = [];
+
+  int depth = 0;
+  int cursor = -1;
+  Token tok;
+
+  var semicolonsRequired = () => state == 0 && depth == 0;
+
+  while (++cursor < code.length) {
+    tok = code[cursor];
+    if (['while', 'function'].contains(tok.literal.toString())) {
+      state = 1;
+    } else if (['if', 'elseif', 'else'].contains(tok.literal.toString())) {
+      state = 2;
+    }
+
+    if (tok.literal == ';' && semicolonsRequired()) {
+      stmt.add(tok);
+      stmts.add(stmt);
+      stmt = [];
+    } else {
+      if ('{}'.contains(tok.literal.toString()) &&
+          tok.literal.toString().isNotEmpty) {
+        depth += tok.literal == '{' ? 1 : -1;
+        if (depth == 0) {
+          if (state == 2 && cursor + 1 < code.length) {
+            // Peek for an else/elseif if we're in a condition stmt
+            if (!['elseif', 'else']
+                .contains(code[cursor + 1].literal.toString())) {
+              stmt.add(tok);
+              stmts.add(stmt);
+              stmt = [];
+              state = 0;
+              continue;
+            }
+          }
+        }
+      }
+
+      stmt.add(tok);
+    }
+  }
+
+  if (stmt.isNotEmpty) {
+    stmts.add(stmt);
+  }
+
+  if (state != 0) {
+    throw 'Syntax Error: Unexpected EOF';
+  }
+
+  return stmts;
+}
+
 Node parse(List<Token> toks) {
-  int cursor = 0;
   Node root = Node(NodeTy.Stmts);
   Node curNode = root;
 
-  while (cursor < toks.length) {
-    bool requiresSemicolon = true;
-    bool inWhile = false;
-    bool ignoreTok = false;
-    int depth = 0;
-    List<Token> passToks = [];
+  List<List<Token>> stmts = getStmts(toks);
 
-    while (cursor < toks.length) {
-      Token tok = toks[cursor];
-
-      if (tok.literal == ';' && requiresSemicolon) {
-        break;
-      } else if (tok.literal == 'while') {
-        inWhile = true;
-      } else if (inWhile) {
-        if (tok.literal == '(') {
-          requiresSemicolon = false;
-          depth += 1;
-        } else if (tok.literal == '{') {
-          inWhile = false;
-          requiresSemicolon = false;
-          depth++;
-          ignoreTok = true;
-        }
-        // } else if (tok.literal == '{') {
-        //   requiresSemicolon = false;
-        //   depth++;
-        // } else if (tok.literal == '}') {
-        //   depth--;
-      }
-      if (ignoreTok) {
-        ignoreTok = false;
-      } else {
-        passToks.add(tok);
-      }
-
-      if (!requiresSemicolon && depth == 0) {
-        break;
-      }
-
-      cursor++;
-    }
-
-    Tuple2<Node, int> res = parseStmt(passToks);
-    // Skip the ;
-    cursor += 1;
+  for (List<Token> stmt in stmts) {
+    Tuple2<Node, int> res = parseStmt(stmt);
     curNode.left = res.item1;
     curNode.right = Node(NodeTy.Stmts);
     curNode = curNode.right;

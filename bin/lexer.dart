@@ -8,6 +8,10 @@ enum TokenTy {
   Keyword,
 }
 
+String printTokBuf(List<Token> tokBuf) {
+  return tokBuf.fold('', (acc, el) => acc + el.literal.toString() + ' ');
+}
+
 class Token {
   TokenTy ty;
   var literal;
@@ -81,6 +85,8 @@ class Token {
       this.isBooleanOperation;
 
   bool get isRightAssociative => literal == '^';
+
+  bool get isConditionMarker => ['if', 'else', 'elseif'].contains(literal);
 
   int precedence() {
     switch (literal) {
