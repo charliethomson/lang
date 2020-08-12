@@ -9,19 +9,41 @@ class Node {
   NodeTy ty;
   var self;
 
-  void set left(Node left) => _left = left;
-  void set right(Node right) => _right = right;
+  void set_left(Node left) {
+    if (ty == NodeTy.Null) {
+      ty = NodeTy.Stmts;
+    }
+    _left = left;
+  }
 
-  Node get left => _left;
-  Node get right => _right;
+  void set_right(Node right) {
+    if (ty == NodeTy.Null) {
+      ty = NodeTy.Stmts;
+    }
+    _right = right;
+  }
+
+  Node left() {
+    if (_left == null) {
+      return Node(NodeTy.Null);
+    }
+    return _left;
+  }
+
+  Node right() {
+    if (_right == null) {
+      return Node(NodeTy.Null);
+    }
+    return _right;
+  }
 
   Node(this.ty);
   Node.withSelf(this.ty, this.self);
 
   bool operator ==(other) =>
       other is Node &&
-      this.left == other.left &&
-      this.right == other.right &&
+      this._left == other._left &&
+      this._right == other._right &&
       this.self == other.self;
 
   @override
@@ -30,8 +52,8 @@ class Node {
 
     indent += 2;
 
-    if (this.right != null) {
-      buffer += this.right.toString(indent: indent);
+    if (this._right != null) {
+      buffer += this._right.toString(indent: indent);
     }
 
     buffer += '\n';
@@ -47,7 +69,7 @@ class Node {
       }
     }
 
-    if (this.left != null) buffer += this.left.toString(indent: indent);
+    if (this._left != null) buffer += this._left.toString(indent: indent);
 
     return buffer;
   }
@@ -243,16 +265,16 @@ Node RPNtoNode(List<Token> rpnToks) {
             unaryFlag = true;
           }
           Node rhs = stack.removeLast();
-          node.right = rhs;
-          node.left = Node(NodeTy.Null);
+          node.set_right(rhs);
+          node.set_left(Node(NodeTy.Null));
         } else {
           if (unaryFlag) unaryFlag = false;
 
           Node rhs = stack.removeLast();
           Node lhs = stack.removeLast();
 
-          node.left = lhs;
-          node.right = rhs;
+          node.set_left(lhs);
+          node.set_right(rhs);
         }
 
         stack.add(node);
@@ -340,8 +362,8 @@ Tuple2<Node, int> parseAssignment(List<Token> toks, int cursor) {
   cursor += res.item2;
 
   Node root = Node(NodeTy.Assignment);
-  root.left = lhsNode;
-  root.right = rhsNode;
+  root.set_left(lhsNode);
+  root.set_right(rhsNode);
 
   return Tuple2(root, cursor);
 }
@@ -410,16 +432,16 @@ Tuple2<Node, int> parseMultiAssignment(List<Token> toks, int cursor) {
     var rhs = tuple[1];
 
     Node assn = Node(NodeTy.Assignment);
-    assn.left = lhs;
-    assn.right = rhs;
+    assn.set_left(lhs);
+    assn.set_right(rhs);
 
-    current.left = assn;
-    current.right = Node(NodeTy.MultiAssignment);
+    current.set_left(assn);
+    current.set_right(Node(NodeTy.MultiAssignment));
     parent = current;
-    current = current.right;
+    current = current.right();
   }
 
-  parent.right = null;
+  parent.set_right(null);
 
   return Tuple2(root, cursor);
 }
@@ -503,18 +525,18 @@ Tuple2<Node, int> parseCondition(List<Token> toks, int cursor) {
 
   Node root = Node(NodeTy.If);
   Node child = Node(NodeTy.Stmts);
-  child.left = condition.isNotEmpty
+  child.set_left(condition.isNotEmpty
       ? parseOperation(condition, 0).item1
-      : Node(NodeTy.Null);
-  child.right = body.isNotEmpty ? parse(body) : Node(NodeTy.Null);
+      : Node(NodeTy.Null));
+  child.set_right(body.isNotEmpty ? parse(body) : Node(NodeTy.Null));
 
-  root.left = child;
+  root.set_left(child);
   var res = parseCondition(toks, cursor);
   if (res != null) {
-    root.right = res.item1;
+    root.set_right(res.item1);
     cursor += res.item2;
   } else {
-    root.right = Node(NodeTy.Null);
+    root.set_right(Node(NodeTy.Null));
   }
 
   return Tuple2(root, cursor);
@@ -561,37 +583,37 @@ Tuple2<Node, int> parseWhile(List<Token> toks, int cursor) {
     if ([assignmentResult, conditionResult, onEachResult]
         .any((element) => element == null || element.item1 == null)) {
       Node left = Node(NodeTy.ComplexWhileCondition);
-      left.left = assignmentResult != null && assignmentResult.item1 != null
+      left.set_left(assignmentResult != null && assignmentResult.item1 != null
           ? assignmentResult.item1
-          : Node(NodeTy.Null);
+          : Node(NodeTy.Null));
 
       Node right = Node(NodeTy.Null);
-      right.left = Node.withSelf(
+      right.set_left(Node.withSelf(
           NodeTy.BooleanCondition,
           conditionResult != null && conditionResult.item1 != null
               ? conditionResult.item1
-              : Node(NodeTy.Null));
-      right.right = onEachResult != null && onEachResult.item1 != null
+              : Node(NodeTy.Null)));
+      right.set_right(onEachResult != null && onEachResult.item1 != null
           ? onEachResult.item1
-          : Node(NodeTy.Null);
+          : Node(NodeTy.Null));
       ;
-      left.right = right;
+      left.set_right(right);
 
-      ret.left = left;
-      ret.right = null;
+      ret.set_left(left);
+      ret.set_right(null);
     } else {
       Node left = Node(NodeTy.ComplexWhileCondition);
-      left.left = assignmentResult.item1;
+      left.set_left(assignmentResult.item1);
 
       Node right = Node(NodeTy.Stmts);
-      right.left =
-          Node.withSelf(NodeTy.BooleanCondition, conditionResult.item1);
-      right.right = onEachResult.item1;
+      right.set_left(
+          Node.withSelf(NodeTy.BooleanCondition, conditionResult.item1));
+      right.set_right(onEachResult.item1);
 
-      left.right = right;
+      left.set_right(right);
 
-      ret.left = left;
-      ret.right = null;
+      ret.set_left(left);
+      ret.set_right(null);
     }
   } else {
     // CASE 2
@@ -602,7 +624,7 @@ Tuple2<Node, int> parseWhile(List<Token> toks, int cursor) {
         ? condResult.item1
         : Node(NodeTy.Null);
 
-    ret.left = Node.withSelf(NodeTy.BooleanCondition, cond);
+    ret.set_left(Node.withSelf(NodeTy.BooleanCondition, cond));
   }
 
   // Body
@@ -615,9 +637,8 @@ Tuple2<Node, int> parseWhile(List<Token> toks, int cursor) {
       depth++;
     } else if (tok.literal == '}') {
       depth--;
-    } else {
-      body.add(tok);
     }
+    body.add(tok);
 
     if (depth == 0) {
       break;
@@ -625,13 +646,13 @@ Tuple2<Node, int> parseWhile(List<Token> toks, int cursor) {
   }
 
   cursor += body.length;
+  if (body.isNotEmpty) {
+    body = body.getRange(1, body.length - 1).toList();
+    Node bodyResult = parse(body);
 
-  Node bodyResult = parse(body);
-
-  if (bodyResult != null) {
-    ret.right = bodyResult;
+    ret.set_right(bodyResult);
   } else {
-    ret.right = Node(NodeTy.Null);
+    ret.set_right(Node(NodeTy.Null));
   }
 
   return Tuple2(ret, cursor);
@@ -676,14 +697,14 @@ Tuple2<Node, int> parseFunctionCall(List<Token> toks, int cursor) {
 
     argsCursor += argToks.length + 1;
 
-    curRhs.left = parseStmt(argToks).item1;
-    curRhs.right = Node(NodeTy.Stmts);
-    curRhs = curRhs.right;
+    curRhs.set_left(parseStmt(argToks).item1);
+    curRhs.set_right(Node(NodeTy.Stmts));
+    curRhs = curRhs.right();
   }
 
   Node root = Node(NodeTy.FunctionCall);
-  root.left = lhs;
-  root.right = rhs;
+  root.set_left(lhs);
+  root.set_right(rhs);
 
   return Tuple2(root, cursor + 2);
 }
@@ -748,15 +769,15 @@ Tuple2<Node, int> parseFunctionDecl(List<Token> toks, int cursor) {
     }
 
     Node newNode = Node.withSelf(NodeTy.Identifier, tok.literal);
-    curLhs.left = newNode;
-    curLhs.right = Node(NodeTy.Stmts);
-    curLhs = curLhs.right;
+    curLhs.set_left(newNode);
+    curLhs.set_right(Node(NodeTy.Stmts));
+    curLhs = curLhs.right();
   }
 
   Tuple2<Node, int> res = parseStmt(body);
 
-  root.right = res.item1;
-  root.left = lhs;
+  root.set_right(res.item1);
+  root.set_left(lhs);
 
   return Tuple2(root, cursor + res.item2);
 }
@@ -773,9 +794,9 @@ Tuple2<Node, int> parseStmt(List<Token> toks) {
     Token curTok = toks[cursor];
     if (curTok == null) {
       if (node != null) {
-        node.left = Node(NodeTy.Null);
-        node.right = Node(NodeTy.Stmts);
-        node = node.right;
+        node.set_left(Node(NodeTy.Null));
+        node.set_right(Node(NodeTy.Stmts));
+        node = node.right();
       } else {
         node = Node(NodeTy.Null);
       }
@@ -848,7 +869,7 @@ Tuple2<Node, int> parseStmt(List<Token> toks) {
 
             Node returnNode = Node(NodeTy.Return);
             Tuple2<Node, int> res = parseStmt(returnExpr);
-            returnNode.left = res.item1;
+            returnNode.set_left(res.item1);
             cursor += res.item2;
             node = returnNode;
             return Tuple2(node, cursor);
@@ -930,9 +951,9 @@ Node parse(List<Token> toks) {
 
   for (List<Token> stmt in stmts) {
     Tuple2<Node, int> res = parseStmt(stmt);
-    curNode.left = res.item1;
-    curNode.right = Node(NodeTy.Stmts);
-    curNode = curNode.right;
+    curNode.set_left(res.item1);
+    curNode.set_right(Node(NodeTy.Stmts));
+    curNode = curNode.right();
   }
 
   return root;

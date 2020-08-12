@@ -203,29 +203,29 @@ let z = x  +  y;
 
     Node root = Node(NodeTy.Stmts);
     Node assn1 = Node(NodeTy.Assignment);
-    assn1.left = Node.withSelf(NodeTy.Identifier, 'x');
-    assn1.right = Node.withSelf(NodeTy.Literal, 10);
-    root.left = assn1;
+    assn1.set_left(Node.withSelf(NodeTy.Identifier, 'x'));
+    assn1.set_right(Node.withSelf(NodeTy.Literal, 10));
+    root.set_left(assn1);
     Node child1 = Node(NodeTy.Stmts);
-    root.right = child1;
+    root.set_right(child1);
 
     Node assn2 = Node(NodeTy.Assignment);
-    assn2.left = Node.withSelf(NodeTy.Identifier, 'y');
-    assn2.right = Node.withSelf(NodeTy.Literal, 0);
-    child1.left = assn2;
+    assn2.set_left(Node.withSelf(NodeTy.Identifier, 'y'));
+    assn2.set_right(Node.withSelf(NodeTy.Literal, 0));
+    child1.set_left(assn2);
 
     Node child2 = Node(NodeTy.Stmts);
-    child1.right = child2;
+    child1.set_right(child2);
 
     Node assn3 = Node(NodeTy.Assignment);
     Node assn3rhs = Node.withSelf(NodeTy.Operation, '+');
-    assn3rhs.left = Node.withSelf(NodeTy.Identifier, 'x');
-    assn3rhs.right = Node.withSelf(NodeTy.Identifier, 'y');
-    assn3.left = Node.withSelf(NodeTy.Identifier, 'z');
-    assn3.right = assn3rhs;
+    assn3rhs.set_left(Node.withSelf(NodeTy.Identifier, 'x'));
+    assn3rhs.set_right(Node.withSelf(NodeTy.Identifier, 'y'));
+    assn3.set_left(Node.withSelf(NodeTy.Identifier, 'z'));
+    assn3.set_right(assn3rhs);
 
-    child2.left = assn3;
-    child2.right = Node(NodeTy.Stmts);
+    child2.set_left(assn3);
+    child2.set_right(Node(NodeTy.Stmts));
 
     print(res);
     print(root);
@@ -264,18 +264,18 @@ let z = x  +  y;
 
     // -a
     Node unary = Node.withSelf(NodeTy.Operation, 'u');
-    unary.left = Node(NodeTy.Null);
-    unary.right = Node.withSelf(NodeTy.Identifier, 'a');
+    unary.set_left(Node(NodeTy.Null));
+    unary.set_right(Node.withSelf(NodeTy.Identifier, 'a'));
 
     // a - <unary>
     Node operation = Node.withSelf(NodeTy.Operation, '-');
-    operation.right = unary;
-    operation.left = Node.withSelf(NodeTy.Identifier, 'a');
+    operation.set_right(unary);
+    operation.set_left(Node.withSelf(NodeTy.Identifier, 'a'));
 
     // <operation> EOF
     Node expected = Node(NodeTy.Stmts);
-    expected.left = operation;
-    expected.right = Node(NodeTy.Null);
+    expected.set_left(operation);
+    expected.set_right(Node(NodeTy.Null));
 
     assert(result == expected);
   });
