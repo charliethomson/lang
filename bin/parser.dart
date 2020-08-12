@@ -903,6 +903,8 @@ List<List<Token>> getStmts(List<Token> code) {
             }
           }
         }
+      } else if (state == 1 && tok.literal.toString() == ')') {
+        state = 0;
       }
 
       stmt.add(tok);
