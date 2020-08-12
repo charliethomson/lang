@@ -256,4 +256,26 @@ let z = x  +  y;
     print(parse(lex('while (;;) { print(a); print(a * a); }')));
     print(parse(lex('while (true) { print("Infinite loop!"); }')));
   });
+
+  test('unaryMinus', () {
+    List<Token> lexed = lex('a- -a');
+    Node result = parse(lexed);
+
+    // -a
+    Node unary = Node.withSelf(NodeTy.Operation, 'u');
+    unary.left = Node(NodeTy.Null);
+    unary.right = Node.withSelf(NodeTy.Identifier, 'a');
+
+    // a - <unary>
+    Node operation = Node.withSelf(NodeTy.Operation, '-');
+    operation.right = unary;
+    operation.left = Node.withSelf(NodeTy.Identifier, 'a');
+
+    // <operation> EOF
+    Node expected = Node(NodeTy.Stmts);
+    expected.left = operation;
+    expected.right = Node(NodeTy.Null);
+
+    assert(result == expected);
+  });
 }

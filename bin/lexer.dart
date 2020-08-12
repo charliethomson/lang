@@ -33,9 +33,11 @@ class Token {
 
   bool get hasTy => ty != null;
 
-  bool get isOperation => [
+  bool get isOperation =>
+      [
         '+',
         '-',
+        'u', // Unary minus
         '*',
         '/',
         '^',
@@ -46,9 +48,11 @@ class Token {
         '/=',
         '^=',
         '%=',
-      ].contains(literal);
+      ].contains(literal) ||
+      isUnaryOperation;
 
-  bool get isBooleanOperation => [
+  bool get isBooleanOperation =>
+      [
         '=',
         '<',
         '<=',
@@ -56,11 +60,13 @@ class Token {
         '>=',
         '>',
         '!=',
-      ].contains(literal);
+      ].contains(literal) ||
+      isBang;
 
-  bool get isBinaryOperation => [
+  bool get isUnaryOperation => [
         '++',
         '--',
+        'u',
       ].contains(literal);
 
   bool get isBang => literal == '!';
@@ -92,6 +98,8 @@ class Token {
         return 4;
       case '%':
         return 5;
+      case 'u': // Unary minus
+        return 6;
       default:
         return 0;
     }
@@ -333,6 +341,14 @@ List<Token> lex(String input) {
     } else {
       var res = scan(c, input.substring(offset + 1));
       if (res != null) {
+        // Check for unary minus
+        if (res.item1.literal == '-') {
+          if (toks.isEmpty) {
+            res.item1.literal = 'u';
+          } else if (toks.last.ty == TokenTy.Operator) {
+            res.item1.literal = 'u';
+          }
+        }
         offset += res.item2;
         toks.add(res.item1);
       }

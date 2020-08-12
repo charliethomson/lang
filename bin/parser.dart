@@ -220,6 +220,7 @@ List<Token> toRPN(List<Token> toks) {
 
 Node RPNtoNode(List<Token> rpnToks) {
   List<Node> stack = [];
+  bool unaryFlag = false;
 
   for (Token token in rpnToks) {
     switch (token.ty) {
@@ -231,12 +232,24 @@ Node RPNtoNode(List<Token> rpnToks) {
         Node node = Node.withSelf(NodeTy.Operation, token.literal);
         if (stack.isEmpty) {
           throw 'stack shouldnt be empty';
-        }
-        Node lhs = stack.removeLast();
-        Node rhs = stack.removeLast();
+        } else if (token.isUnaryOperation) {
+          // a ++ b, a u b
+          // gets cleared if a - u b -> the unary operator is followed (rpn) by a binary operator
+          if (stack.length.isEven) {
+            unaryFlag = true;
+          }
+          Node rhs = stack.removeLast();
+          node.right = rhs;
+          node.left = Node(NodeTy.Null);
+        } else {
+          if (unaryFlag) unaryFlag = false;
 
-        node.left = lhs;
-        node.right = rhs;
+          Node rhs = stack.removeLast();
+          Node lhs = stack.removeLast();
+
+          node.left = lhs;
+          node.right = rhs;
+        }
 
         stack.add(node);
         break;
@@ -247,6 +260,8 @@ Node RPNtoNode(List<Token> rpnToks) {
 
   if (stack.isEmpty) {
     throw 'stack should not be empty';
+  } else if (unaryFlag) {
+    throw 'Syntax error: Attempt to use unary operator as binary operator';
   } else {
     return stack.removeLast();
   }
