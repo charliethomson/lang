@@ -2,18 +2,18 @@ import 'dart:io';
 
 import 'lexer.dart';
 import 'parser.dart';
+import 'executor.dart';
 
 void main(List<String> arguments) {
   var file = new File("./examples/fib.ln");
   var contents = file.readAsStringSync();
 
-  print(parse(lex(contents)));
+  executeTree(parse(lex(contents)));
 }
 
 /*
-
-    Stmts
-  Stmts
+        Stmts
+      Stmts
                   Stmts
                 Stmts
                     Identifier:z
@@ -30,23 +30,24 @@ void main(List<String> arguments) {
               Operation:=
                 Identifier:z
           Stmts
+                Stmts
               Stmts
-            While
-              BooleanCondition
-                  Literal:255
-                Operation:<
-                  Identifier:z
-        Stmts
-            Literal:1
-          Operation:=
-            Identifier:y
-      Stmts
-          Literal:0
-        Operation:=
-          Identifier:x
-    While
-      BooleanCondition
-        Literal:true
+                Identifier:z
+            FunctionCall
+              Identifier:print
+        While
+          BooleanCondition
+              Literal:255
+            Operation:<
+              Identifier:z
+    Stmts
+        Literal:1
+      Operation:=
+        Identifier:y
+  Stmts
+      Literal:0
+    Operation:=
+      Identifier:x
 Stmts
       MultiAssignment
           Null

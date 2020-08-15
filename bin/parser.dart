@@ -9,6 +9,10 @@ class Node {
   NodeTy ty;
   var self;
 
+  bool get isAssignment =>
+      [NodeTy.Assignment, NodeTy.MultiAssignment].contains(ty) ||
+      '=,+=,-=,/=,*='.split(',').contains(self);
+
   void set_left(Node left) {
     if (ty == NodeTy.Null) {
       ty = NodeTy.Stmts;
@@ -446,7 +450,9 @@ Tuple2<Node, int> parseMultiAssignment(List<Token> toks, int cursor) {
   return Tuple2(root, cursor);
 }
 
+// TODO: collections
 Tuple2<Node, int> parseCollection(List<Token> toks, int cursor) {}
+
 Tuple2<Node, int> parseCondition(List<Token> toks, int cursor) {
   // if (a == b) { .. } else if ( a == c) { .. } else { .. }
   /*
@@ -657,7 +663,6 @@ Tuple2<Node, int> parseWhile(List<Token> toks, int cursor) {
 
   return Tuple2(ret, cursor);
 }
-// TODO: Kill self again
 
 Tuple2<Node, int> parseFunctionCall(List<Token> toks, int cursor) {
   // print("Hello World!");
