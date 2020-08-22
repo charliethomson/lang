@@ -324,6 +324,7 @@ Tuple2<Token, int> scan(String c, String rest) {
 
 List<Token> lex(String input) {
   List<Token> toks = [];
+  // TODO: Comments
 
   var offset = 0;
   var c;

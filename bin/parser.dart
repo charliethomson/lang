@@ -917,17 +917,17 @@ List<List<Token>> getStmts(List<Token> code) {
           tok.literal.toString().isNotEmpty) {
         depth += tok.literal == '{' ? 1 : -1;
         if (depth == 0) {
-          if (state == 2 && cursor + 1 < code.length) {
+          if (state == 2 &&
+              cursor + 1 < code.length &&
+              !['elseif', 'else']
+                  .contains(code[cursor + 1].literal.toString())) {
             // Peek for an else/elseif if we're in a condition stmt
-            if (!['elseif', 'else']
-                .contains(code[cursor + 1].literal.toString())) {
-              stmt.add(tok);
-              stmts.add(stmt);
-              stmt = [];
-              state = 0;
-              continue;
-            }
+            state = 0;
           }
+          stmt.add(tok);
+          stmts.add(stmt);
+          stmt = [];
+          continue;
         }
       } else if (state == 1 && tok.literal.toString() == ')') {
         state = 0;
@@ -955,6 +955,8 @@ Node parse(List<Token> toks) {
   List<List<Token>> stmts = getStmts(toks);
 
   for (List<Token> stmt in stmts) {
+    print(stmt.fold(
+        '', (acc, el) => acc.toString() + el.literal.toString() + ' '));
     Tuple2<Node, int> res = parseStmt(stmt);
     curNode.set_left(res.item1);
     curNode.set_right(Node(NodeTy.Stmts));

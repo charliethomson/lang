@@ -1,5 +1,12 @@
+import 'package:quiver/iterables.dart';
+
 import 'parser.dart';
 import 'lexer.dart';
+import 'dart:io';
+
+Context globalCtx = Context();
+Context curCtx = globalCtx;
+List<Context> stack = [globalCtx];
 
 // TODO: Make less bad
 Node replaceSelfInChildren(Node node, dynamic from, dynamic to) {
@@ -23,8 +30,8 @@ String stripQuotes(dynamic s) {
 }
 
 void main() {
-  ctx.variables['a'] = 10;
-  print(ctx.tryGet(Node.withSelf(NodeTy.Identifier, 'a')));
+  curCtx.variables['a'] = 10;
+  print(curCtx.tryGet(Node.withSelf(NodeTy.Identifier, 'a')));
 }
 
 var OPERATIONS = {
@@ -44,8 +51,6 @@ var OPERATIONS = {
 // TODO: This whole thing
 // also some of parser
 // im mentally drained rn :)
-
-Context ctx = new Context();
 
 // int || String || bool
 dynamic executeOperation(Node node) {
@@ -67,19 +72,23 @@ dynamic executeOperation(Node node) {
 }
 
 String executeAssignment(Node node) {
-  switch (node.ty) {
-    case NodeTy.Operation:
-    case NodeTy.Assignment:
-      var value = executeNode(node.right());
-      ctx.push_variable(node.left().self, value);
-      // print("${node.left().self} = $value;");
-      return "${node.left().self} = $value;";
-    case NodeTy.MultiAssignment:
-      // print(
-      // "${executeAssignment(node.left())}\n${executeAssignment(node.right())}");
-      return "${executeAssignment(node.left())}\n${executeAssignment(node.right())}";
-    default:
-      return null;
+  if (node.right().ty == NodeTy.FunctionDecl) {
+    curCtx.parse_and_push_function(node);
+  } else {
+    switch (node.ty) {
+      case NodeTy.Operation:
+      case NodeTy.Assignment:
+        var value = executeNode(node.right());
+        curCtx.push_variable(node.left().self, value);
+        // print("${node.left().self} = $value;");
+        return "${node.left().self} = $value;";
+      case NodeTy.MultiAssignment:
+        // print(
+        // "${executeAssignment(node.left())}\n${executeAssignment(node.right())}");
+        return "${executeAssignment(node.left())}\n${executeAssignment(node.right())}";
+      default:
+        return null;
+    }
   }
 }
 
@@ -92,15 +101,16 @@ void executeFunction(Node node) {
     cur = cur.right();
   }
 
-  var function = ctx.functions[ident];
-  if (function.runtimeType == Node) {
-    Node cur = function;
-    while (cur.right().ty != NodeTy.Null) {
-      if (cur.ty == NodeTy.Identifier) {}
+  var function = curCtx.functions[ident];
+  if (function == null) {
+    var global = globalCtx.functions[ident];
+    if (global == null) {
+      throw "Unrecognized function $ident";
+    } else {
+      global.execute(args);
     }
-  } else {
-    function(args);
   }
+  function.execute(args);
 }
 
 dynamic executeWhile(Node node) {
@@ -114,8 +124,8 @@ bool executeComplexCondition(node) {
   Node assn = node.left();
   Node cond = node.right().left();
   Node onEach = node.right().right();
-  if (!ctx.varUsed(assn.left().self.toString())) {
-    ctx.parse_and_push_variable(assn);
+  if (!curCtx.varUsed(assn.left().self.toString())) {
+    curCtx.parse_and_push_variable(assn);
   }
 
   if (!executeNode(cond)) {
@@ -139,9 +149,9 @@ dynamic executeNode(Node node) {
       return executeOperation(node);
     case NodeTy.FunctionCall:
       return executeFunction(node);
-    case NodeTy.FunctionDecl:
-      ctx.parse_and_push_function(node);
-      return Node(NodeTy.Null);
+    // case NodeTy.FunctionDecl:
+    //   curCtx.parse_and_push_function(node);
+    //   return Node(NodeTy.Null);
     case NodeTy.Assignment:
     case NodeTy.MultiAssignment:
       return executeAssignment(node);
@@ -157,8 +167,8 @@ dynamic executeNode(Node node) {
     case NodeTy.Literal:
       return node.self;
     case NodeTy.Identifier:
-      // print(ctx.tryGet(node.self));
-      return ctx.tryGet(node.self);
+      // print(curCtx.tryGet(node.self));
+      return curCtx.tryGet(node.self);
 //TODO:    case NodeTy.Collection:
     case NodeTy.Return:
     default:
@@ -170,20 +180,29 @@ void executeTree(Node tree) {
   Node cur = tree;
   while (cur != null && cur.ty != NodeTy.Null) {
     // print("cur: ${cur.ty.toString()}:${cur.self}");
-    executeNode(cur.left());
+    var res = executeNode(cur.left());
+    res != null ? print(res) : null;
     cur = cur.right();
   }
 }
 
 class Context {
   Map<String, dynamic> variables;
-  Map<String, dynamic> functions;
+  Map<String, Function> functions;
 
   Context() {
     variables = new Map();
     functions = {
-      'print': (List<dynamic> args, {String sep = ''}) => print(args.join(sep)),
+      'print': Function([],
+          (List<dynamic> args, {String sep = ', '}) => print(args.join(sep))),
     };
+  }
+
+  Context.withGlobal() {
+    this.variables = new Map();
+    this.functions = new Map();
+    globalCtx.functions.forEach((key, value) => this.functions[key] = value);
+    globalCtx.variables.forEach((key, value) => this.variables[key] = value);
   }
 
   void push_variable(String varName, var value) {
@@ -202,8 +221,8 @@ class Context {
     variables[varName] = clean_value;
   }
 
-  void push_function(String fnIdent, Node tree) {
-    functions[fnIdent] = tree;
+  void push_function(String fnIdent, Function fn) {
+    functions[fnIdent] = fn;
   }
 
   Type varType(String varName) {
@@ -221,14 +240,54 @@ class Context {
     return tryVar != null ? tryVar : tryFunc != null ? tryFunc : null;
   }
 
-  void parse_and_push_function(Node tree) {}
+  void parse_and_push_function(Node tree) {
+    String ident = tree.left().self;
+    functions[ident] = Function.fromNode(tree);
+  }
+
   void parse_and_push_variable(Node tree) {}
 }
 
-class Interpreter {
-  Node tree;
-  Node curNode;
-  Context ctx;
+void startInterpreter() {
+  String line = "";
+  while (true) {
+    stdout.write(">> ");
+    line = stdin.readLineSync();
+    executeTree(parse(lex(line)));
+  }
+}
 
-  Interpreter() {}
+class Function {
+  List<String> args;
+  dynamic body;
+
+  Function(this.args, this.body);
+
+  Function.fromNode(Node root) {
+    this.body = root.right().right();
+    this.args = [];
+    Node curArg = root.right().left();
+    while (curArg.left().ty != NodeTy.Null) {
+      this.args.add(curArg.left().self);
+      curArg = curArg.right();
+    }
+  }
+
+  dynamic execute(List<dynamic> args) {
+    if (this.body.runtimeType == Node) {
+      stack.add(curCtx);
+      curCtx = Context.withGlobal();
+      zip([args, this.args]).forEach((element) {
+        // Initialize the current stack frame
+        var input = element[0];
+        var ident = element[1];
+        curCtx.push_variable(ident, input);
+      });
+      executeNode(this.body);
+      curCtx = stack.removeLast();
+    } else {
+      // Assume its a closure / builtin
+      this.body(args);
+    }
+  }
 }

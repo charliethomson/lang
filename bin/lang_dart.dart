@@ -8,6 +8,12 @@ void main(List<String> arguments) {
   var file = new File("./examples/fib.ln");
   var contents = file.readAsStringSync();
 
+  var test = '';
+  lex(contents).forEach((el) => test += el.literal.toString() + ' ');
+  print(test);
+
+  print(parse(lex(contents)));
+
   executeTree(parse(lex(contents)));
 }
 
