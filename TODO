@@ -1,0 +1,21 @@
+TODO
+
+remove the redundant Stmts nodes (ex:
+    >These
+    Stmts
+  Stmts
+          >These
+          Stmts
+        Stmts
+          Literal:21
+      Stmts
+            >These
+            Stmts
+          Stmts
+            Literal:19
+        FunctionCall
+          Identifier:foo
+    FunctionCall
+      Identifier:print
+Stmts
+)

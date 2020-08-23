@@ -373,4 +373,15 @@ let z = x  +  y;
       assert(ListEquality().equals(i[0], i[1]));
     }
   });
+  test('functionsinfunctions', () {
+    String input = """
+    let foo = function(a, b) {
+      return a + b; 
+    }
+    print(foo(foo(9, 5 + 5), 21));
+    """;
+    var lexed = lex(input);
+    var parsed = parse(lexed);
+    print(parsed);
+  });
 }

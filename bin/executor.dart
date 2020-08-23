@@ -29,11 +29,6 @@ String stripQuotes(dynamic s) {
   return s.toString().replaceAll('"', '').replaceAll("'", '');
 }
 
-void main() {
-  curCtx.variables['a'] = 10;
-  print(curCtx.tryGet(Node.withSelf(NodeTy.Identifier, 'a')));
-}
-
 var OPERATIONS = {
   '+ String String': (a, b) => '"${stripQuotes(a) + stripQuotes(b)}"',
   '+ double double': (a, b) => a + b,
@@ -58,7 +53,7 @@ dynamic executeOperation(Node node) {
   dynamic right = executeNode(node.right());
 
   if (node.isAssignment) {
-    executeAssignment(node);
+    return executeAssignment(node);
   } else {
     var operation =
         OPERATIONS['${node.self} ${left.runtimeType} ${right.runtimeType}'];
@@ -92,7 +87,7 @@ String executeAssignment(Node node) {
   }
 }
 
-void executeFunction(Node node) {
+dynamic executeFunction(Node node) {
   List<dynamic> args = [];
   String ident = node.left().self;
   Node cur = node.right();
@@ -107,13 +102,13 @@ void executeFunction(Node node) {
     if (global == null) {
       throw "Unrecognized function $ident";
     } else {
-      global.execute(args);
+      return global.execute(args);
     }
   }
-  function.execute(args);
+  return function.execute(args);
 }
 
-dynamic executeWhile(Node node) {
+void executeWhile(Node node) {
   Node condition = node.left();
   while (executeNode(condition)) {
     executeTree(node.right());
@@ -134,8 +129,6 @@ bool executeComplexCondition(node) {
     executeNode(onEach);
     return true;
   }
-
-  ;
 }
 
 dynamic executeIf(Node node) {}
@@ -144,7 +137,6 @@ dynamic executeNode(Node node) {
   switch (node.ty) {
     case NodeTy.Stmts:
       return executeNode(node.left());
-
     case NodeTy.Operation:
       return executeOperation(node);
     case NodeTy.FunctionCall:
@@ -168,9 +160,16 @@ dynamic executeNode(Node node) {
       return node.self;
     case NodeTy.Identifier:
       // print(curCtx.tryGet(node.self));
-      return curCtx.tryGet(node.self);
+      var val = curCtx.tryGet(node.self);
+      if (val != null) {
+        return val;
+      } else {
+        throw "unknown identifier ${node.self}";
+      }
+      break;
 //TODO:    case NodeTy.Collection:
     case NodeTy.Return:
+      return executeNode(node.left());
     default:
       return Node(NodeTy.Null);
   }
@@ -179,9 +178,10 @@ dynamic executeNode(Node node) {
 void executeTree(Node tree) {
   Node cur = tree;
   while (cur != null && cur.ty != NodeTy.Null) {
-    // print("cur: ${cur.ty.toString()}:${cur.self}");
-    var res = executeNode(cur.left());
-    res != null ? print(res) : null;
+    dynamic res = executeNode(cur.left());
+    if (!isNull(res)) {
+      print(res);
+    }
     cur = cur.right();
   }
 }
@@ -253,7 +253,11 @@ void startInterpreter() {
   while (true) {
     stdout.write(">> ");
     line = stdin.readLineSync();
-    executeTree(parse(lex(line)));
+    try {
+      executeTree(parse(lex(line)));
+    } catch (e) {
+      print(e);
+    }
   }
 }
 
@@ -283,11 +287,31 @@ class Function {
         var ident = element[1];
         curCtx.push_variable(ident, input);
       });
-      executeNode(this.body);
+      dynamic res = executeNode(this.body);
       curCtx = stack.removeLast();
+      return res;
     } else {
       // Assume its a closure / builtin
-      this.body(args);
+      return this.body(args);
     }
   }
 }
+
+bool isNull(var item) {
+  return [
+        Node,
+      ].contains(item.runtimeType) ||
+      item == null;
+}
+
+// extension NullableNode on Node {
+//   bool isNull() => true;
+// }
+
+// extension NullableNode on Node {
+//   bool isNull() => true;
+// }
+
+// extension NullableNode on Node {
+//   bool isNull() => true;
+// }

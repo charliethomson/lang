@@ -5,66 +5,24 @@ import 'parser.dart';
 import 'executor.dart';
 
 void main(List<String> arguments) {
-  var file = new File("./examples/fib.ln");
-  var contents = file.readAsStringSync();
+  // var file = new File("./examples/fib.ln");
+  // var contents = file.readAsStringSync();
 
-  var test = '';
-  lex(contents).forEach((el) => test += el.literal.toString() + ' ');
-  print(test);
+  // var test = '';
+  // lex(contents).forEach((el) => test += el.literal.toString() + ' ');
+  // print(test);
 
-  print(parse(lex(contents)));
+  // print(parse(lex(contents)));
 
-  executeTree(parse(lex(contents)));
+  // executeTree(parse(lex(contents)));
+
+  // startInterpreter();
+
+  // print(parse(lex("let foo = function(a, b) { return a + b; }")));
+  executeTree(parse(lex("""
+let foo = function(a, b) {
+  return a + b; 
 }
-
-/*
-        Stmts
-      Stmts
-                  Stmts
-                Stmts
-                    Identifier:z
-                  Operation:=
-                    Identifier:y
-              Stmts
-                  Identifier:y
-                Operation:=
-                  Identifier:x
-            Stmts
-                  Identifier:y
-                Operation:+
-                  Identifier:x
-              Operation:=
-                Identifier:z
-          Stmts
-                Stmts
-              Stmts
-                Identifier:z
-            FunctionCall
-              Identifier:print
-        While
-          BooleanCondition
-              Literal:255
-            Operation:<
-              Identifier:z
-    Stmts
-        Literal:1
-      Operation:=
-        Identifier:y
-  Stmts
-      Literal:0
-    Operation:=
-      Identifier:x
-Stmts
-      MultiAssignment
-          Null
-        Assignment
-          Identifier:z
-    MultiAssignment
-        Null
-      Assignment
-        Identifier:y
-  MultiAssignment
-      Null
-    Assignment
-      Identifier:x
-*/
+print(foo(foo(9, 5 + 5), 21));
+    """)));
+}

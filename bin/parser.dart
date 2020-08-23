@@ -681,28 +681,46 @@ Tuple2<Node, int> parseFunctionCall(List<Token> toks, int cursor) {
     throw 'Syntax error: encountered ${tok.literal}, expected \'(\'';
   }
 
-  List<Token> args = [];
+  List<List<Token>> args = [];
+  List<Token> arg = [];
+  int depth = 1;
 
   while (++cursor < toks.length) {
     tok = toks[cursor];
     if (tok.literal == ')') {
-      break;
+      if (--depth == 0) {
+        break;
+      } else {
+        arg.add(tok);
+      }
+    } else if (tok.literal == '(') {
+      // function call as argument
+      arg.add(tok);
+      depth++;
+    } else if (tok.literal == ',') {
+      if (depth == 1) {
+        args.add(arg);
+        arg = [];
+      } else {
+        arg.add(tok);
+      }
+    } else {
+      arg.add(tok);
     }
+  }
 
-    args.add(tok);
+  if (arg.isNotEmpty) {
+    args.add(arg);
+    arg = [];
   }
 
   Node rhs = Node(NodeTy.Stmts);
   Node curRhs = rhs;
-  int argsCursor = 0;
 
-  while (argsCursor < args.length) {
-    List<Token> argToks =
-        args.skip(argsCursor).takeWhile((el) => el.literal != ',').toList();
+  for (List<Token> arg in args) {
+    Node node = parseStmt(arg).item1;
 
-    argsCursor += argToks.length + 1;
-
-    curRhs.set_left(parseStmt(argToks).item1);
+    curRhs.set_left(node);
     curRhs.set_right(Node(NodeTy.Stmts));
     curRhs = curRhs.right();
   }
@@ -955,8 +973,6 @@ Node parse(List<Token> toks) {
   List<List<Token>> stmts = getStmts(toks);
 
   for (List<Token> stmt in stmts) {
-    print(stmt.fold(
-        '', (acc, el) => acc.toString() + el.literal.toString() + ' '));
     Tuple2<Node, int> res = parseStmt(stmt);
     curNode.set_left(res.item1);
     curNode.set_right(Node(NodeTy.Stmts));
