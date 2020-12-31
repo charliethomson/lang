@@ -729,7 +729,7 @@ Tuple2<Node, int> parseFunctionCall(List<Token> toks, int cursor) {
   root.set_left(lhs);
   root.set_right(rhs);
 
-  return Tuple2(root, cursor + 2);
+  return Tuple2(root, cursor);
 }
 
 Tuple2<Node, int> parseFunctionDecl(List<Token> toks, int cursor) {
@@ -833,7 +833,6 @@ Tuple2<Node, int> parseStmt(List<Token> toks) {
           case '(':
             if (last == TokenTy.Identifier) {
               return parseFunctionCall(toks, cursor - 1);
-              // function call
             }
             break;
           case '[':

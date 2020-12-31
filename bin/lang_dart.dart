@@ -8,21 +8,23 @@ void main(List<String> arguments) {
   // var file = new File("./examples/fib.ln");
   // var contents = file.readAsStringSync();
 
-  // var test = '';
-  // lex(contents).forEach((el) => test += el.literal.toString() + ' ');
-  // print(test);
+  // var lexed = lex(contents);
+  // print(lexed.fold(
+  //     "".toString(),
+  //     (previousValue, element) =>
+  //         previousValue.toString() + element.literal.toString()));
+  // var parsed = parse(lexed);
+  // print(parsed);
 
-  // print(parse(lex(contents)));
+  // executeTree(parsed);
 
-  // executeTree(parse(lex(contents)));
+  startInterpreter();
 
-  // startInterpreter();
-
-  // print(parse(lex("let foo = function(a, b) { return a + b; }")));
-  executeTree(parse(lex("""
-let foo = function(a, b) {
-  return a + b; 
-}
-print(foo(foo(9, 5 + 5), 21));
-    """)));
+//   // print(parse(lex("let foo = function(a, b) { return a + b; }")));
+//   executeTree(parse(lex("""
+// let foo = function(a, b) {
+//   return a + b;
+// }
+// print(foo(foo(9, 5 + 5), 21));
+//     """)));
 }

@@ -33,13 +33,21 @@ var OPERATIONS = {
   '+ String String': (a, b) => '"${stripQuotes(a) + stripQuotes(b)}"',
   '+ double double': (a, b) => a + b,
   '+ int int': (a, b) => a + b,
-  '+ bool bool': (a, b) => {a ? true : b ? true : false},
+  '- int int': (a, b) => a - b,
+  '+ bool bool': (a, b) => {
+        a
+            ? true
+            : b
+                ? true
+                : false
+      },
   '* double double': (a, b) => a * b,
   '* int int': (a, b) => a * b,
   '* String int': (a, b) => a * b,
   '/ double double': (a, b) => a / b,
   '/ int int': (a, b) => a / b,
   '< int int': (a, b) => a < b,
+  '== int int': (a, b) => a == b,
   // TODO
 };
 
@@ -61,7 +69,8 @@ dynamic executeOperation(Node node) {
     if (operation == null) {
       throw "No implementation found for ${left.runtimeType} ${node.self} ${right.runtimeType}";
     } else {
-      return operation(left, right);
+      var res = operation(left, right);
+      return res;
     }
   }
 }
@@ -131,7 +140,29 @@ bool executeComplexCondition(node) {
   }
 }
 
-dynamic executeIf(Node node) {}
+dynamic executeIf(Node node) {
+  // if the if is an else
+  if (node.left().left().ty == NodeTy.Null && node.right().ty == NodeTy.Null) {
+    return executeNode(node.left().right());
+  }
+  var result = executeNode(node.left().left());
+  // if the condition is true
+  if (result.runtimeType == bool && result) {
+    return executeNode(node.left().right());
+  } else {
+    while (result.runtimeType == Node) {
+      result = executeNode(result);
+    }
+    if (result.runtimeType == bool && result) {
+      if (result) {
+        return executeNode(node.left().right());
+      }
+    } else {
+      var output = executeNode(node.right());
+      return output;
+    }
+  }
+}
 
 dynamic executeNode(Node node) {
   switch (node.ty) {
@@ -237,7 +268,11 @@ class Context {
   dynamic tryGet(dynamic key) {
     var tryVar = variables[key];
     var tryFunc = functions[key];
-    return tryVar != null ? tryVar : tryFunc != null ? tryFunc : null;
+    return tryVar != null
+        ? tryVar
+        : tryFunc != null
+            ? tryFunc
+            : null;
   }
 
   void parse_and_push_function(Node tree) {
